@@ -8,7 +8,7 @@ A minimalist Python command line tool to query the STS (Society of Thoracic Surg
 # Overview
 This tool might be helpful if you need to query the STS risk calculator repeatedly, for a bunch of patients.
 
-The STS Calculator itself is a bit of a black box — patient parameters are passed to the STS API and a risk is returned (no computing happens client side).  A few (obvious) parameters impact mortality most heavily (e.g. ESRD).
+The STS Calculator itself is a black box — patient parameters are passed to the STS API and a risk is returned (no computing happens client side).  A few (obvious) parameters impact mortality most heavily (e.g. ESRD). Unfortunately, the risk calculator somewhat randomly changes its input parameters every few years.
 
 
 # Individual Usage
