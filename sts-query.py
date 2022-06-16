@@ -10,11 +10,11 @@
 # Source: https://github.com/semenko/sts-risk-calculator-cli
 
 import argparse
-from lib2to3.pgen2.parse import Parser
 import requests
 import time
 
 STS_API_URL = "https://riskcalc.sts.org/stswebriskcalc/v1/calculate/stsall"
+
 
 def query_sts_api(argparse_vars_as_dict):
 
@@ -44,6 +44,13 @@ predvent: 0.03045
 """
 
 def main():
+    """
+    Essentially all heavy lifting happens here -- the argparse parameters encode the right STS API variable names,
+    and then calls the minimalist query_sts_api() function to get the results.
+
+    Note that the STS API is a little odd -- it requires *all* parameters to be passed (even if they're empty)
+    it includes misspellings (race is sometimes "rac"), it does almost nothing client side (except BMI calculation?).
+    """
     parser = argparse.ArgumentParser(description="Query the STS Short-Term Risk Calculator (v4.2)",
                                      epilog="Written by Nick Semenkovich <semenko@alum.mit.edu> https://nick.semenkovich.com",
                                      usage='%(prog)s [options]',
@@ -55,43 +62,56 @@ def main():
     core_args.add_argument('--gender', dest="gender", type=int, choices=['Male', 'Female'])
 
     group_race = parser.add_argument_group('race')
+    # Note: These labels match the web interface.
     group_race.add_argument('--asian', dest="raceasian", action='store_const', const='Yes', default='')
-    group_race.add_argument('--black', dest="race_black", action='store_true')
-    group_race.add_argument('--indian-alaskan', dest="race_indian", action='store_true')
-    group_race.add_argument('--hawaiian-islander', dest="race_hawaiian", action='store_true')
-    group_race.add_argument('--hispanic-latino', dest="race_hispanic", action='store_true')
+    group_race.add_argument('--black', dest="raceblack", action='store_const', const='Yes', default='')
+    group_race.add_argument('--indian-alaskan', dest="racenativeam", action='store_const', const='Yes', default='')
+    # Missing an "e" in race -- on STS's end.
+    group_race.add_argument('--hawaiian-islander', dest="racnativepacific", action='store_const', const='Yes', default='')
+    group_race.add_argument('--hispanic-latino', dest="ethnicity", action='store_const', const='Yes', default='')
 
     metadata = parser.add_argument_group('metadata')
-    metadata.add_argument('--payor', dest="payor", type=str, choices=['self', 'medicare', 'medicaid', 'commercial', 'hmo', 'military', 'non-US'])
-    metadata.add_argument('--supplemental-payor', dest="supp_payor", type=str, choices=['self', 'medicare', 'medicaid', 'commercial', 'hmo', 'military', 'non-US'])
-    metadata.add_argument('--date', dest="date", type=str, metavar="8/11/2017")
+    metadata.add_argument('--payor', dest="payorprim", type=str, choices=['self', 'medicare', 'medicaid', 'commercial', 'hmo', 'military', 'non-US'])
+    metadata.add_argument('--supplemental-payor', dest="payorsecond", type=str, choices=['self', 'medicare', 'medicaid', 'commercial', 'hmo', 'military', 'non-US'])
+    metadata.add_argument('--date', dest="surgdt", type=str, metavar="8/11/2017")
+
+    biometrics = parser.add_argument_group('biometrics')
+    biometrics.add_argument('--weight-kg', dest="weightkg", metavar='{10-250}', type=int, choices=range(1, 111))
+    biometrics.add_argument('--height-cm', dest="heightcm", metavar='{20-251}', type=int, choices=range(1, 111))
+    biometrics.add_argument('--hct', dest="hct", metavar='{1.00-99.99}', type=float, choices=range(1, 111))
+    biometrics.add_argument('--wbc', dest="wbc", metavar='{0.10-99.99}', type=float, choices=range(1, 111))
+    biometrics.add_argument('--platelets', dest="platelets", metavar='{1000-900000}', type=int, choices=range(1000, 900001))
+    biometrics.add_argument('--creatinine', dest="creatlst", metavar='{0.10-30.00}', type=int, choices=range(1, 111))
+    # ?? Calculated BMI parameter calculatedbmi
+
+    comorbidities = parser.add_argument_group('comorbidities')
+    comorbidities.add_argument('--', dest="dialysis", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="hypertn", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="immsupp", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="pvd", action='store_const', const='Yes', default='')
+
+    comorbidities.add_argument('--', dest="cvd", action='store_const', const='Yes', default='')
+    # comorbidities.add_argument('--', dest="cvdtia", action='store_const', const='Yes', default='')
+    # comorbidities.add_argument('--', dest="cvdpcarsurg", action='store_const', const='Yes', default='')
+
+    comorbidities.add_argument('--', dest="mediastrad", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="cancer", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="fhcad", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="slpapn", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="liverdis", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="unrespstat", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--', dest="syncope", action='store_const', const='Yes', default='')
+
+    comorbidities.add_argument('--', dest="diabetes", action='store_const', const='Yes', default='')
+    # diabctrl
+    comorbidities.add_argument('--', dest="infendo", action='store_const', const='Yes', default='')
+    # infendty
+
+    comorbidities.add_argument('--', dest="cva", action='store_const', const='Yes', default='')
+    # cvawhen
+   
 
 
-    # Weight kg
-    # Height Cm
-
-    # Labs
-    # HCT (or Hgb)
-    # WBC
-    # PLT
-    # Cr
-
-    # Comorbidities 
-    # Dialysis
-    # HTN
-    # Immunocompromised
-    # PAD
-    # CVD
-    # Mediastinal XRT
-    # Cancer w/i 5yr
-    # Family CAD
-    # Sleep apnea
-    # Liver disease
-    # Unresponsive
-    # Syncope
-    # Diabetes
-    ## Diabetes control
-    # endocarditis
     # Chronic lung disease
     # Stenosis R Carotid
     # Stenosis L carotid
