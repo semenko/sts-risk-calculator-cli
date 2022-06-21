@@ -1,0 +1,4 @@
+id, procid, age, gender, surgdt, weightkg, heightcm, creatlst, payorprim
+1, 1, 56, Male, 08/11/2017, 72, 124, 1.5, "Commercial Health Insurance"
+2, 3, 72, Female, 12/16/2018, 60, 96, 2.9, 
+3, 4, 42, Male, 7/21/2021, 50, 110, 1.2, "Non-U.S. Plan"

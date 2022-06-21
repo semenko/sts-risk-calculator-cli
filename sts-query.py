@@ -27,8 +27,12 @@ STS_PARAMS_REQUIRED = ["age", "gender", "raceasian", "raceblack", "racenativeam"
 "medster", "medgp", "resusc", "numdisv", "stenleftmain", "laddiststenpercent", "hdef", "vdstena", "vdstenm", "vdinsufa", "vdinsufm", "vdinsuft",
 "vdaoprimet", "incidenc", "status", "iabpwhen", "cathbasassistwhen", "ecmowhen", "calculatedbmi", "procid"]
 
+# An empty API query with all required parmeters defined (but empty)
+STS_QUERY_STUB = {key:'' for key in STS_PARAMS_REQUIRED}
+
 # The optional API parameters
 STS_PARAMS_OPTIONAL = []
+
 
 def validate_sts_data(patient_data):
     """
@@ -52,8 +56,6 @@ def validate_sts_data(patient_data):
 
 
 def query_sts_api(patient_data):
-    # calculatedbmi
-
     # NOTE: The STS API requires *all* parameters be passed, even if they're empty, otherwise it throws a 500 error.
     # There must be at *least* 99 parameters, but some conditional parameters can be omitted. (e.g. secondary insurance)
     assert(len(patient_data) >= 99)
@@ -91,8 +93,8 @@ def parse_csv(csv_file):
     """
     Load an input CSV of STS queries.
     
-    NOTE: Your CSV header must be the same as the STS API parameters.
-    Your CSV entries must *exactly* match the STS query parameters.
+    NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
+    and your CSV entries must *exactly* match the STS query parameters.
 
     We do limited validity testing here.
 
@@ -101,6 +103,8 @@ def parse_csv(csv_file):
     """
     with open(csv_file, 'r') as f:
         lines = f.readlines()
+
+    print(lines)
 
     # The first line is the header, so skip it.
     lines = lines[1:]
@@ -307,10 +311,17 @@ def main():
     }
     comorbidities.add_argument('--hf-timing', dest="heartfailtmg", type=lambda x: hfwhen_dict[x], metavar=list(hfwhen_dict.keys()))
 
+    classnyh_dict = {
+        '1': 'Class I',
+        '2': 'Class II',
+        '3': 'Class III',
+        '4': 'Class IV',
+        'unknown': "Not documented"
+    }
+    comorbidities.add_argument('--nyha-class', dest="classnyh", type=lambda x: classnyh_dict[x], metavar=list(classnyh_dict.keys()))
 
-     "classnyh": "Class III",
-     "cardsymptimeofadm": "Stable Angina",
-     "carshock": "Yes, not at the time of the procedure but within prior 24 hours",
+    #  "cardsymptimeofadm": "Stable Angina",
+    #  "carshock": "Yes, not at the time of the procedure but within prior 24 hours",
     
     rhythm_timing_dict = {
         'none': 'None',
@@ -327,17 +338,25 @@ def main():
     comorbidities.add_argument('--sick-sinus', dest="arrhythsss", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
     comorbidities.add_argument('--vt-vf', dest="arrhythvv", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
     
-    "medinotr": "Yes",
-    "medadp5days": "No",
-    "medadpidis": "",
-    "medacei48": "Contraindicated",
-    "medbeta": "No",
-    "medster": "No",
-    "medgp": "Yes",
-    "resusc": "Yes - More than 1 hour but less than 24 hours of the start of the procedure",
-    "numdisv": "One",
-    "stenleftmain": "N/A",
-    "laddiststenpercent": "50 - 69%",
+    comorbidities.add_argument('--inotropes', dest="medinotr", action='store_const', const='Yes', default='')
+
+    # TODO: Fix
+    # NOTE: The API allows more complex values here (contraindicated / unknown), which we ignore.  Yes/No/Empty.
+    comorbidities.add_argument('--adp-inhibitor', dest="medadp5days", action='store_const', const='Yes', default='')
+    "medadpidis": 
+    comorbidities.add_argument('--ace-arb', dest="medadpidis", action='store_const', const='Yes', default='')
+
+    comorbidities.add_argument('--beta-blocker', dest="medacei48", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--steroids', dest="medbeta", action='store_const', const='Yes', default='')
+    comorbidities.add_argument('--inotropes', dest="medster", action='store_const', const='Yes', default='')
+
+    comorbidities.add_argument('--gp2b3a', dest="medgp", action='store_const', const='Yes', default='')
+
+
+    # "resusc": "Yes - More than 1 hour but less than 24 hours of the start of the procedure",
+    # "numdisv": "One",
+    # "stenleftmain": "N/A",
+    # "laddiststenpercent": "50 - 69%",
 
     comorbidities.add_argument('--ef', dest="hdef", metavar='{1.0-99.0}', type=float, choices=range(1, 111), required=True)
     comorbidities.add_argument('--aortic-stenosis', dest="vdstena", action='store_const', const='Yes', default='')
