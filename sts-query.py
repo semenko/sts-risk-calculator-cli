@@ -12,6 +12,7 @@
 import argparse
 import csv
 import datetime
+from pydoc import describe
 import sys
 import time
 
@@ -207,11 +208,11 @@ def validate_and_return_csv_data(csv_entry):
     assert data['classnyh'] in ['Class I', 'Class II', 'Class III','Class IV', 'Not documented', '']
 
     #  "cardsymptimeofadm": "Stable Angina",
-    #  "carshock": "Yes, not at the time of the procedure but within prior 24 hours",
+
+    assert data['carshock'] in ['Yes - At the time of the procedure', 'Yes, not at the time of the procedure but within prior 24 hours', '']
     
     rhythm_onset = ['None', 'Remote (> 30 days preop)', 'Recent (<= 30 days preop)', '']
     assert data['arrhythatrfib'] in rhythm_onset
-    # "arrhythafib": "Persistent",
     assert data['arrhythaflutter'] in rhythm_onset
     assert data['arrhyththird'] in rhythm_onset
     assert data['arrhythsecond'] in rhythm_onset
@@ -230,22 +231,65 @@ def validate_and_return_csv_data(csv_entry):
     assert data['medster'] in yes_or_empty
     assert data['medgp'] in yes_or_empty
 
-    # "resusc": "Yes - More than 1 hour but less than 24 hours of the start of the procedure",
-    # "numdisv": "One",
-    # "stenleftmain": "N/A",
-    # "laddiststenpercent": "50 - 69%",
+    assert data['resusc'] in ['Yes - Within 1 hour of the start of the procedure', 'Yes - More than 1 hour but less than 24 hours of the start of the procedure', '']
+
+    # Why is this not an int?!!
+    assert data['numdisv'] in ['None', 'One', 'Two', 'Three', '']
+    assert data['stenleftmain'] in ['Yes', 'No', 'N/A', '']
+    # Left main > 50%
+    assert data['laddiststenpercent'] in ['50 - 69%', '>=70%', '']
 
     assert (data['hdef'] == '') or  (1.0 <= float(hdef) <= 99.0)
     # AS & MS
     assert data['vdstena'] in yes_or_empty
     assert data['vdstenm'] in yes_or_empty
 
-    valve_severity = ['Trivial/Trace', 'Mild', 'Severe', 'Not documented', '']
+    valve_severity = ['Trivial/Trace', 'Mild', 'Moderate', 'Severe', 'Not documented', '']
     assert data['vdinsufa'] in valve_severity
     assert data['vdinsufm'] in valve_severity
     assert data['vdinsuft'] in valve_severity
 
-    #  "vdaoprimet": "Congenital (other than Bicuspid, Unicuspid, or Quadricuspid)",
+    # We don't validate all these options:
+    valve_indications = ["Bicuspid valve disease",
+        "Unicuspid valve disease",
+        "Quadricuspid valve disease",
+        "Congenital (other than Bicuspid, Unicuspid, or Quadricuspid)",
+        "Degenerative- Calcified",
+        "Degenerative- Leaflet prolapse with or without annular dilatation",
+        "Degenerative- Pure annular dilatation without leaflet prolapse",
+        "Degenerative - Commissural Rupture",
+        "Degenerative - Extensive Fenestration",
+        "Degenerative - Leaflet perforation / hole",
+        "Endocarditis, native valve with root abscess",
+        "Endocarditis, native valve without root abscess",
+        "Endocarditis, prosthetic valve with root abscess",
+        "Endocarditis, prosthetic valve without root abscess",
+        "LV Outflow Tract Pathology, HOCM",
+        "LV Outflow Tract Pathology, Sub-aortic membrane",
+        "LV Outflow Tract Pathology, Sub-aortic tunnel",
+        "LV Outflow Tract Pathology, Other",
+        "Primary Aortic Disease, Aortic Dissection",
+        "Primary Aortic Disease, Atherosclerotic Aneurysm",
+        "Primary Aortic Disease, Ehler-Danlos Syndrome",
+        "Primary Aortic Disease, Hypertensive Aneurysm",
+        "Primary Aortic Disease, Idiopathic Root dilatation",
+        "Primary Aortic Disease, Inflammatory",
+        "Primary Aortic Disease, Loeys-Dietz Syndrome",
+        "Primary Aortic Disease, Marfan Syndrome",
+        "Primary Aortic Disease, Other Connective tissue disorder",
+        "Radiation induced heart disease",
+        "Reoperation - Failure of previous AV repair or replacement",
+        "Rheumatic",
+        "Supravalvular Aortic Stenosis",
+        "Trauma",
+        "Carcinoid",
+        "Tumor, Myxoma",
+        "Tumor, Papillary Fibroelastoma",
+        "Tumor, Other",
+        "Mixed Etiology",
+        "Not documented",
+        ""]
+    assert data['vdaoprimet'] in valve_indications
 
     assert data['incidenc'] in ['First cardiovascular surgery', 'First re-op cardiovascular surgery', 'Second re-op cardiovascular surgery',
                                 'Third re-op cardiovascular surgery', 'Fourth or more re-op cardiovascular surgery', 'NA - Not a cardiovascular surgery', '']
@@ -278,11 +322,27 @@ def main():
 
     parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r'), required=True)
 
+    parser.add_argument('--dry-run', dest='dryrun', action="store_true", help="Only validate data, do not query the STS API.")
+
+    parser.add_argument('--override', dest='override', nargs='+', help='Optionally override values sent to the STS API. ' +
+    'For example, set all patients to the same age with --override age=50', metavar='stsvariable=value')
+
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
         sys.exit(1)
     args = parser.parse_args()
 
+    override_dict = {}
+    if args.override:
+        print("NOTE: Override values supplied -- these will be sent to the STS API, instead of the values in your .csv")
+
+        for entry in args.override:
+            split_entry = entry.split("=")
+            assert len(split_entry) == 2, "Can't handle multiple = in override value."
+            assert split_entry[1] != "id", "Cannot override patient ID."
+            override_dict[split_entry[0]] = split_entry[1]
+
+        assert all(key in STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL for key in override_dict.keys()), "Override value is not one of the defined STS keys."
 
     print("Validating CSV entries.")
     # NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
@@ -293,35 +353,39 @@ def main():
     csv_dictreader = csv.DictReader(args.csv_file)
     for row in csv_dictreader:
         print(f"\tPatient ID: {row['id']}", end='')
-        validated_patient_data.append(validate_and_return_csv_data(row))
+        overriden_row = row | override_dict
+        validated_patient_data.append(validate_and_return_csv_data(overriden_row))
         print(' OK.')
 
 
-    # A dict of patient_id to the STS risk values
-    # e.g. '1': {pred6d: 0.37929, pred14d: 0.04021 …}
-    sts_results = {}
+    if not args.dryrun:
+        # A dict of patient_id to the STS risk values
+        # e.g. '1': {pred6d: 0.37929, pred14d: 0.04021 …}
+        sts_results = {}
 
-    print("\nQuerying STS API.")
-    # Query the API for all CSV entries
-    for entry in tqdm.tqdm(validated_patient_data):
-        patient_id = entry['id']
-        # Don't send the ID to STS
-        del entry['id']
+        print("\nQuerying STS API.")
+        # Query the API for all CSV entries
+        for entry in tqdm.tqdm(validated_patient_data):
+            patient_id = entry['id']
+            # Don't send the ID to STS
+            del entry['id']
 
-        assert(patient_id not in sts_results), "Your patient IDs were not unique!"
-        sts_results[patient_id] = query_sts_api(entry)
+            assert(patient_id not in sts_results), "Your patient IDs were not unique!"
+            sts_results[patient_id] = query_sts_api(entry)
 
-    result_filename = 'results.csv'
+        result_filename = 'results.csv'
 
-    with open(result_filename, 'w') as csv_output:
-        writer = csv.DictWriter(csv_output, fieldnames=['id'] + STS_EXPECTED_RESULTS)
-        writer.writeheader()
-        for patient_id, patient_results in sts_results.items():
-            # Shove the ID back in for DictWriter
-            patient_results['id'] = patient_id
-            writer.writerow(patient_results)
+        with open(result_filename, 'w') as csv_output:
+            writer = csv.DictWriter(csv_output, fieldnames=['id'] + STS_EXPECTED_RESULTS)
+            writer.writeheader()
+            for patient_id, patient_results in sts_results.items():
+                # Shove the ID back in for DictWriter
+                patient_results['id'] = patient_id
+                writer.writerow(patient_results)
 
-    print(f"\nDone!\nResults written to: {result_filename}")
+        print(f"\nDone!\nResults written to: {result_filename}")
+    else:
+        print(f"Data valid! (Dry run requested, STS API not queried.)")
 
 if __name__ == '__main__':
     main()
