@@ -15,8 +15,8 @@ import datetime
 import sys
 import time
 
-import json
 import requests
+import tqdm
 
 # Modern python please (esp for | operator, https://peps.python.org/pep-0584/)
 assert sys.version_info >= (3, 9)
@@ -41,6 +41,8 @@ STS_QUERY_STUB = {key:'' for key in STS_PARAMS_REQUIRED}
 # TODO: Add all other params
 STS_PARAMS_OPTIONAL = ["id"] # ID is an internal parameter we allow
 
+STS_EXPECTED_RESULTS = ["predmort","predmm","preddeep","pred14d","predstro","predvent","predrenf","predreop","pred6d"]
+
 def query_sts_api(sts_query_dict):
     # The STS client side computes BMI (why?)
     sts_query_dict['calculatedbmi'] = round(
@@ -48,30 +50,17 @@ def query_sts_api(sts_query_dict):
         ((float(sts_query_dict['heightcm']) / 100.0) ** 2)),
         2)
 
-    print(sts_query_dict)
-    #a = json.dumps(sts_query_dict)
-    #print(a)
     response = requests.post(url=STS_API_URL, json=sts_query_dict)
     time.sleep(1)
 
     if response.status_code != requests.codes.ok:
         raise Exception("STS API returned status code %d" % response.status_code)
 
-    print("ALIVE!")
-    print(response.json())
-    return response.json()
+    sts_response = response.json()
 
-"""
-pred6d: 0.37929
-pred14d: 0.04021
-preddeep: 0.00116
-predmm: 0.06003
-predmort: 0.02005
-predrenf: 0.01222
-predreop: 0.01626
-predstro: 0.00402
-predvent: 0.03045
-"""
+    assert all(k in STS_EXPECTED_RESULTS for k in sts_response.keys()), f"API returned an unexpected value in: {sts_response.keys()}"
+
+    return response.json()
 
 
 def validate_and_return_csv_data(csv_entry):
@@ -303,20 +292,36 @@ def main():
 
     csv_dictreader = csv.DictReader(args.csv_file)
     for row in csv_dictreader:
-        print(f"\tID: {row['id']}", end='')
+        print(f"\tPatient ID: {row['id']}", end='')
         validated_patient_data.append(validate_and_return_csv_data(row))
         print(' OK.')
 
 
-    print("Querying STS API.")
-    # Query the API for all CSV entries
-    for entry in validated_patient_data:
-        print(f"ID: {entry['id']}")
-        del entry['id']
-        print(query_sts_api(entry))
-        break
+    # A dict of patient_id to the STS risk values
+    # e.g. '1': {pred6d: 0.37929, pred14d: 0.04021 …}
+    sts_results = {}
 
-    print("Done.")
+    print("\nQuerying STS API.")
+    # Query the API for all CSV entries
+    for entry in tqdm.tqdm(validated_patient_data):
+        patient_id = entry['id']
+        # Don't send the ID to STS
+        del entry['id']
+
+        assert(patient_id not in sts_results), "Your patient IDs were not unique!"
+        sts_results[patient_id] = query_sts_api(entry)
+
+    result_filename = 'results.csv'
+
+    with open(result_filename, 'w') as csv_output:
+        writer = csv.DictWriter(csv_output, fieldnames=['id'] + STS_EXPECTED_RESULTS)
+        writer.writeheader()
+        for patient_id, patient_results in sts_results.items():
+            # Shove the ID back in for DictWriter
+            patient_results['id'] = patient_id
+            writer.writerow(patient_results)
+
+    print(f"\nDone!\nResults written to: {result_filename}")
 
 if __name__ == '__main__':
     main()
