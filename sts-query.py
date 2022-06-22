@@ -10,9 +10,16 @@
 # Source: https://github.com/semenko/sts-risk-calculator-cli
 
 import argparse
+import csv
+import datetime
+import sys
 import time
 
+import json
 import requests
+
+# Modern python please (esp for | operator, https://peps.python.org/pep-0584/)
+assert sys.version_info >= (3, 9)
 
 STS_API_URL = "https://riskcalc.sts.org/stswebriskcalc/v1/calculate/stsall"
 
@@ -31,52 +38,29 @@ STS_PARAMS_REQUIRED = ["age", "gender", "raceasian", "raceblack", "racenativeam"
 STS_QUERY_STUB = {key:'' for key in STS_PARAMS_REQUIRED}
 
 # The optional API parameters
-STS_PARAMS_OPTIONAL = []
+# TODO: Add all other params
+STS_PARAMS_OPTIONAL = ["id"] # ID is an internal parameter we allow
 
-
-def validate_sts_data(patient_data):
-    """
-    Validate the dict we're about to pass to the STS API.
-
-    Input: patient_data (dict)
-    Output: True if the data is valid, False otherwise
-    """
-    # Check the required parameters are present
-    assert all(key in patient_data.keys() for key in STS_PARAMS_REQUIRED)
-
-    # Check the parameters are all allowable
-    assert all(key in STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL for key in patient_data.keys())
-
-    if patient_data['cvdtia'] != "" or patient_data['cvdpcarsurg'] != "":
-        assert patient_data['cvd'] == "Yes", "cvd must be set if a TIA or prior cartoid procedure is true."
-
-    # TODO: Add more tests here.
-
-    return True
-
-
-def query_sts_api(patient_data):
-    # NOTE: The STS API requires *all* parameters be passed, even if they're empty, otherwise it throws a 500 error.
-    # There must be at *least* 99 parameters, but some conditional parameters can be omitted. (e.g. secondary insurance)
-    assert(len(patient_data) >= 99)
-
-    # The STS client side computes BMI (why)?
-    patient_data['calculatedbmi'] = round(
-        (float(patient_data['weight-kg']) /
-        ((100 * patient_data['height-cm']) ** 2)),
+def query_sts_api(sts_query_dict):
+    # The STS client side computes BMI (why?)
+    sts_query_dict['calculatedbmi'] = round(
+        (float(sts_query_dict['weightkg']) /
+        ((float(sts_query_dict['heightcm']) / 100.0) ** 2)),
         2)
 
-    print(patient_data)
-
-    response = requests.post(url=STS_API_URL, params=patient_data)
+    print(sts_query_dict)
+    #a = json.dumps(sts_query_dict)
+    #print(a)
+    response = requests.post(url=STS_API_URL, json=sts_query_dict)
     time.sleep(1)
 
     if response.status_code != requests.codes.ok:
         raise Exception("STS API returned status code %d" % response.status_code)
 
+    print("ALIVE!")
+    print(response.json())
     return response.json()
 
-#
 """
 pred6d: 0.37929
 pred14d: 0.04021
@@ -89,190 +73,123 @@ predstro: 0.00402
 predvent: 0.03045
 """
 
-def parse_csv(csv_file):
+
+def validate_and_return_csv_data(csv_entry):
     """
-    Load an input CSV of STS queries.
-    
-    NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
-    and your CSV entries must *exactly* match the STS query parameters.
+    Validate the dict we're about to pass to the STS API.
 
-    We do limited validity testing here.
+    NOTE: We perform some validation, but it's not complete.
 
-    Input: csv_file (str)
-    Output: list of dicts
+    Input: patient_data (dict)
+    Output: returns an entry that passed validation
     """
-    with open(csv_file, 'r') as f:
-        lines = f.readlines()
+    # Check the required parameters are present
+   # assert all(key in data.keys() for key in STS_PARAMS_REQUIRED)
 
-    print(lines)
+    # Check the parameters are all allowable
+    assert all(key in STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL for key in csv_entry.keys()), "You have a column that's not one of the defined STS keys."
 
-    # The first line is the header, so skip it.
-    lines = lines[1:]
+    # Union of these two dicts, overwriting keys from the user supplied CSV entries where able
+    data = STS_QUERY_STUB | csv_entry
 
-    
-
-def main():
-    """
-    Essentially all heavy lifting happens here -- the argparse parameters encode the right STS API variable names,
-    and then calls the minimalist query_sts_api() function to get the results.
-
-    Note that the STS API is a little odd -- it requires *all* parameters to be passed (even if they're empty)
-    it includes oddities (race is sometimes "rac"), it does almost nothing client side (except BMI calculation?).
-
-    If you use this code, please consider citing me and this repository.
-    """
-    parser = argparse.ArgumentParser(description="Query the STS Short-Term Risk Calculator (v4.2)\nPlease cite this if using in a publication.",
-                                     epilog="Written by Nick Semenkovich <semenko@alum.mit.edu> https://nick.semenkovich.com",
-                                     usage='%(prog)s [options]',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    core_args = parser.add_argument_group("core")
     procedure_dict = {
-        'CAB': 1,
-        'AVR': 2,
-        'MVR': 3,
-        'AVR+CAB': 4,
-        'MVR+CAB': 5,
-        'MVRepair': 6,
-        'MVRepair+CAB': 7,
+        'CAB': '1',
+        'AVR': '2',
+        'MVR': '3',
+        'AVR+CAB': '4',
+        'MVR+CAB': '5',
+        'MVRepair': '6',
+        'MVRepair+CAB': '7',
     }
-    core_args.add_argument('--procedure', dest="procid", type=lambda x: procedure_dict[x], metavar=list(procedure_dict.keys()), required=True)
-    core_args.add_argument('--age', dest="age", metavar='{1-110}', type=int, choices=range(1, 111), required=True)
-    core_args.add_argument('--gender', dest="gender", type=int, choices=['Male', 'Female'])
+    assert data['procid'] in procedure_dict.values()
 
-    group_race = parser.add_argument_group('race')
-    # Note: These labels match the web interface.
-    group_race.add_argument('--asian', dest="raceasian", action='store_const', const='Yes', default='')
-    group_race.add_argument('--black', dest="raceblack", action='store_const', const='Yes', default='')
-    group_race.add_argument('--indian-alaskan', dest="racenativeam", action='store_const', const='Yes', default='')
+    assert int(data['age']) in range(1,111)
+    assert data['gender'] in ['Male', 'Female', '']
+
+    yes_or_empty = ['Yes', '']
+    ## Race/Ethnicity Parameters
+    assert data['raceasian'] in yes_or_empty
+    assert data['raceblack'] in yes_or_empty
+    assert data['racenativeam'] in yes_or_empty
     # Missing an "e" in race -- on STS's end.
-    group_race.add_argument('--hawaiian-islander', dest="racnativepacific", action='store_const', const='Yes', default='')
-    group_race.add_argument('--hispanic-latino', dest="ethnicity", action='store_const', const='Yes', default='')
+    assert data['racnativepacific'] in yes_or_empty
+    # Hispanic/latino
+    assert data['ethnicity'] in yes_or_empty
 
-    metadata = parser.add_argument_group('metadata')
 
-    payor_dict = {
-        'self': 'None / self',
-        'medicare': 'Medicare (includes commercially managed options)',
-        'medicaid': 'Medicaid (includes commercially managed options)',
-        'commercial': 'Commercial Health Insurance',
-        'hmo': 'Health Maintenance Organization',
-        'non-US': 'Non-U.S. Plan',
-        'other': 'Other',
-        }
-    metadata.add_argument('--payor', dest="payorprim", type=lambda x: payor_dict[x], metavar=list(payor_dict.keys()))
-    metadata.add_argument('--supplemental-payor', dest="payorsecond", type=lambda x: payor_dict[x], metavar=list(payor_dict.keys()))
-    metadata.add_argument('--date', dest="surgdt", type=str, metavar="8/11/2017")
+    ## Patient Metadata
+    payors = ['None / self', 'Medicare (includes commercially managed options)', 'Medicaid (includes commercially managed options)',
+     'Commercial Health Insurance', 'Health Maintenance Organization', 'Non-U.S. Plan', 'Other', '']
+    assert data['payorprim'] in payors
+    assert data['payorsecond'] in payors
+    if data['payorsecond'] != "":
+        assert data['payorprim'] != ""
 
-    biometrics = parser.add_argument_group('biometrics')
-    biometrics.add_argument('--weight-kg', dest="weightkg", metavar='{10-250}', type=int, choices=range(10, 251))
-    biometrics.add_argument('--height-cm', dest="heightcm", metavar='{20-251}', type=int, choices=range(20, 252))
-    biometrics.add_argument('--hct', dest="hct", metavar='{1.00-99.99}', type=float)
-    biometrics.add_argument('--wbc', dest="wbc", metavar='{0.10-99.99}', type=float)
-    biometrics.add_argument('--platelets', dest="platelets", metavar='{1000-900000}', type=int, choices=range(1000, 900001))
-    biometrics.add_argument('--creatinine', dest="creatlst", metavar='{0.10-30.00}', type=float)
+    datetime.datetime.strptime(data['surgdt'], "%m/%d/%Y")
 
-    comorbidities = parser.add_argument_group('comorbidities')
-    comorbidities.add_argument('--dialysis', dest="dialysis", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--hypertension', dest="hypertn", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--immunosuppressed', dest="immsupp", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--pvd', dest="pvd", action='store_const', const='Yes', default='')
+    ## Biometrics
 
-    comorbidities.add_argument('--cvd', dest="cvd", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--cvd-tia', dest="cvdtia", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--cvd-carotid-procedure', dest="cvdpcarsurg", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--cva', dest="cva", action='store_const', const='Yes', default='')
-    cvawhen_dict = {
-    'this-month': '<= 30 days',
-    'older': '> 30 days',
-    }
-    comorbidities.add_argument('--cva-when', dest="cvawhen", type=lambda x: cvawhen_dict[x], metavar=list(cvawhen_dict.keys()))
+    # We require weight/height for BMI calc later
+    assert (int(data['weightkg']) in range(10,251))
+    assert (int(data['heightcm']) in range(20, 252))
 
-    comorbidities.add_argument('--mediastinal-radiation', dest="mediastrad", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--cancer', dest="cancer", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--fh-cad', dest="fhcad", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--sleep-apnea', dest="slpapn", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--liver-disease', dest="liverdis", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--unresponsive', dest="unrespstat", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--syncope', dest="syncope", action='store_const', const='Yes', default='')
+    assert (data['hct'] == "") or (1 <= int(data['hct']) <= 100)
+    assert (data['wbc'] == "") or (0.1 <= float(data['wbc']) <= 100)
+    assert (data['platelets'] == "") or (int(data['platelets']) in range(1000, 900001))
+    assert (data['creatlst'] == "") or (0.10 <= float(data['creatlst']) <= 30)
 
-    comorbidities.add_argument('--diabetes', dest="diabetes", action='store_const', const='Yes', default='')
-    diabctrl_dict = {
-        'none': 'None',
-        'diet': 'Diet only',
-        'oral': 'Oral',
-        'insulin': 'Insulin',
-        'other-injection': 'Other SubQ',
-        'other': 'Other',
-        'unknown': 'Unknown',
-        }
-    comorbidities.add_argument('--diabetes-control', dest="diabctrl", type=lambda x: diabctrl_dict[x], metavar=list(diabctrl_dict.keys()))
+    ## Comorbidities
+    assert data['dialysis'] in yes_or_empty
+    assert data['hypertn'] in yes_or_empty
+    assert data['immsupp'] in yes_or_empty
+    assert data['pvd'] in yes_or_empty
 
-    comorbidities.add_argument('--endocarditis', dest="infendo", action='store_const', const='Yes', default='')
-    infendty_dict = {
-    'treated': 'Treated',
-    'active': 'Active',
-    }
-    comorbidities.add_argument('--endocarditis-type', dest="infendty", type=lambda x: infendty_dict[x], metavar=list(infendty_dict.keys()))
+    assert data['cvd'] in yes_or_empty
+    assert data['cvdtia'] in yes_or_empty
+    assert data['cvdpcarsurg'] in yes_or_empty
 
-    chrlungd_dict = {
-    'no': 'No',
-    'mild': 'Mild',
-    'moderate': 'Moderate',
-    'severe': 'Severe',
-    'unknown-severity': 'Lung disease documented, severity unknown',
-    'unknown': 'Unknown',
-    }
-    comorbidities.add_argument('--chronic-lung-disease', dest="chrlungd", type=lambda x: chrlungd_dict[x], metavar=list(chrlungd_dict.keys()))
+    if data['cvdtia'] != '' or data['cvdpcarsurg'] != '':
+        assert data['cvd'] == 'Yes', "cvd must be set if a TIA or prior cartoid procedure is true."
+
+    assert data['cva'] in yes_or_empty
+    assert data['cvawhen'] in ['<= 30 days', '> 30 days', '']
+    if data['cvawhen'] != '':
+        assert data['cva'] != ''
+
+    assert data['mediastrad'] in yes_or_empty
+    assert data['cancer'] in yes_or_empty
+    assert data['fhcad'] in yes_or_empty
+    assert data['slpapn'] in yes_or_empty
+    assert data['liverdis'] in yes_or_empty
+    assert data['unrespstat'] in yes_or_empty
+    assert data['syncope'] in yes_or_empty
+
+    assert data['diabetes'] in yes_or_empty
+    assert data['diabctrl'] in ['None', 'Diet only', 'Oral','Insulin', 'Other SubQ', 'Other', 'Unknown', '']
+    if data['diabctrl'] != '':
+        assert data['diabetes'] != ''
+
+    assert data['infendo'] in yes_or_empty
+    assert data['infendty'] in ['Treated', 'Active', '']
+    if data['infendty'] != '':
+        assert data['infendo'] != ''
+
+    assert data['chrlungd'] in ['No', 'Mild', 'Moderate', 'Severe', 'Lung disease documented, severity unknown', 'Unknown', '']
  
-    stenosis_dict = {
-        '50-79': '50% to 79%',
-        '80-99': '80% to 99%',
-        '100': '100%',
-        'unknown': 'Not documented',
-    }
-    comorbidities.add_argument('--right-carotid-stenosis', dest="cvdstenrt", type=lambda x: stenosis_dict[x], metavar=list(stenosis_dict.keys()))
-    comorbidities.add_argument('--left-carotid-stenosis', dest="cvdstenlft", type=lambda x: stenosis_dict[x], metavar=list(stenosis_dict.keys()))
+    stenosis_pct = ['50% to 79%', '80% to 99%', '100%', 'Not documented', '']
+    assert data['cvdstenrt'] in stenosis_pct
+    assert data['cvdstenlft'] in stenosis_pct
 
-    comorbidities.add_argument('--illicits', dest="ivdrugab", action='store_const', const='Yes', default='')
+    assert data['ivdrugab'] in yes_or_empty
+    assert data['alcohol'] in ['<= 1 drink/week', '2-7 drinks/week', '>= 8 drinks/week', 'None', 'Unknown', '']
 
-    alcohol_dict = {
-        '1': '<= 1 drink/week',
-        '2-7': '2-7 drinks/week',
-        '8': '>= 8 drinks/week',
-        'none' : 'None',
-        'unknown': 'Unknown',
-    }
-    comorbidities.add_argument('--alcohol', dest="alcohol", type=lambda x: alcohol_dict[x], metavar=list(alcohol_dict.keys()))
+    assert data['pneumonia'] in ['Recent', 'Remote', 'No', 'Unknown', '']
 
-    pneumonia_dict = {
-        'recent': 'Recent',
-        'remote': 'Remote',
-        'no': 'No',
-        'unknown': 'Unknown',
-    }
-    comorbidities.add_argument('--pneumonia', dest="pneumonia", type=lambda x: pneumonia_dict[x], metavar=list(pneumonia_dict.keys()))
+    assert data['tobaccouse'] in ['Never smoker', 'Current every day smoker', 'Current some day smoker', 'Smoker, current status (frequency) unknown', 'Former smoker', 'Smoking status unknown', '']
 
-    tobaccouse_dict = {
-        'never': 'Never smoker',
-        'every-day': 'Current every day smoker',
-        'some-days': 'Current some day smoker',
-        'current': 'Smoker, current status (frequency) unknown',
-        'former': 'Former smoker',
-        'unknown': 'Smoking status unknown',
-    }
-    comorbidities.add_argument('--tobacco', dest="tobaccouse", type=lambda x: tobaccouse_dict[x], metavar=list(tobaccouse_dict.keys()))
+    assert data['hmo2'] in ['Yes, PRN', 'Yes, oxygen dependent', 'No', 'Unknown', '']
 
-    hmo2_dict = {
-        'prn': 'Yes, PRN',
-        'yes': 'Yes, oxygen dependent',
-        'no': 'No',
-        'unknown': 'Unknown',
-    }
-    comorbidities.add_argument('--home-o2', dest="hmo2", type=lambda x: hmo2_dict[x], metavar=list(hmo2_dict.keys()))
-
-    # Previous Interventions
-    # NOT IMPLEMENTED
+    # Not Validated Yet
     """
     "prcvint": "Yes",
     "prcab": "",
@@ -295,129 +212,111 @@ def main():
     "pocpciin": "",
     """
     
-    miwhen_dict = {
-        '6hr': '<=6 Hrs',
-        '6-24hr': '>6 Hrs but <24 Hrs',
-        '1-7days': '1 to 7 Days',
-        '8-21days': '8 to 21 Days',
-        '>21days': '>21 Days',
-    }
-    comorbidities.add_argument('--mi', dest="miwhen", type=lambda x: miwhen_dict[x], metavar=list(miwhen_dict.keys()))
+    assert data['miwhen'] in ['<=6 Hrs', '>6 Hrs but <24 Hrs', '1 to 7 Days', '8 to 21 Days', '>21 Days', '']
+    assert data['heartfailtmg'] in ['Acute', 'Chronic', 'Both', '']
 
-    hfwhen_dict = {
-        'acute': 'Acute',
-        'chronic': 'Chronic',
-        'both': 'Both'
-    }
-    comorbidities.add_argument('--hf-timing', dest="heartfailtmg", type=lambda x: hfwhen_dict[x], metavar=list(hfwhen_dict.keys()))
-
-    classnyh_dict = {
-        '1': 'Class I',
-        '2': 'Class II',
-        '3': 'Class III',
-        '4': 'Class IV',
-        'unknown': "Not documented"
-    }
-    comorbidities.add_argument('--nyha-class', dest="classnyh", type=lambda x: classnyh_dict[x], metavar=list(classnyh_dict.keys()))
+    assert data['classnyh'] in ['Class I', 'Class II', 'Class III','Class IV', 'Not documented', '']
 
     #  "cardsymptimeofadm": "Stable Angina",
     #  "carshock": "Yes, not at the time of the procedure but within prior 24 hours",
     
-    rhythm_timing_dict = {
-        'none': 'None',
-        'remote': 'Remote (> 30 days preop)',
-        'recent': 'Recent (<= 30 days preop)'
-    }
-    comorbidities.add_argument('--afib', dest="arrhythatrfib", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
-
-    "arrhythafib": "Persistent",
-
-    comorbidities.add_argument('--aflutter', dest="arrhythaflutter", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
-    comorbidities.add_argument('--3deg-block', dest="arrhyththird", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
-    comorbidities.add_argument('--2deg-block', dest="arrhythsecond", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
-    comorbidities.add_argument('--sick-sinus', dest="arrhythsss", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
-    comorbidities.add_argument('--vt-vf', dest="arrhythvv", type=lambda x: rhythm_timing_dict[x], metavar=list(rhythm_timing_dict.keys()))
+    rhythm_onset = ['None', 'Remote (> 30 days preop)', 'Recent (<= 30 days preop)', '']
+    assert data['arrhythatrfib'] in rhythm_onset
+    # "arrhythafib": "Persistent",
+    assert data['arrhythaflutter'] in rhythm_onset
+    assert data['arrhyththird'] in rhythm_onset
+    assert data['arrhythsecond'] in rhythm_onset
+    assert data['arrhythsss'] in rhythm_onset
+    assert data['arrhythvv'] in rhythm_onset
     
-    comorbidities.add_argument('--inotropes', dest="medinotr", action='store_const', const='Yes', default='')
+    assert data['medinotr'] in yes_or_empty
 
     # TODO: Fix
     # NOTE: The API allows more complex values here (contraindicated / unknown), which we ignore.  Yes/No/Empty.
-    comorbidities.add_argument('--adp-inhibitor', dest="medadp5days", action='store_const', const='Yes', default='')
-    "medadpidis": 
-    comorbidities.add_argument('--ace-arb', dest="medadpidis", action='store_const', const='Yes', default='')
+    assert data['medadp5days'] in yes_or_empty
+    assert data['medadpidis'] in yes_or_empty # ????
 
-    comorbidities.add_argument('--beta-blocker', dest="medacei48", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--steroids', dest="medbeta", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--inotropes', dest="medster", action='store_const', const='Yes', default='')
-
-    comorbidities.add_argument('--gp2b3a', dest="medgp", action='store_const', const='Yes', default='')
-
+    assert data['medacei48'] in yes_or_empty
+    assert data['medbeta'] in yes_or_empty
+    assert data['medster'] in yes_or_empty
+    assert data['medgp'] in yes_or_empty
 
     # "resusc": "Yes - More than 1 hour but less than 24 hours of the start of the procedure",
     # "numdisv": "One",
     # "stenleftmain": "N/A",
     # "laddiststenpercent": "50 - 69%",
 
-    comorbidities.add_argument('--ef', dest="hdef", metavar='{1.0-99.0}', type=float, choices=range(1, 111), required=True)
-    comorbidities.add_argument('--aortic-stenosis', dest="vdstena", action='store_const', const='Yes', default='')
-    comorbidities.add_argument('--mitral-stenosis', dest="vdstenm", action='store_const', const='Yes', default='')
+    assert (data['hdef'] == '') or  (1.0 <= float(hdef) <= 99.0)
+    # AS & MS
+    assert data['vdstena'] in yes_or_empty
+    assert data['vdstenm'] in yes_or_empty
 
-    valve_severity = {
-        'trace': 'Trivial/Trace',
-        'mild': 'Mild',
-        'moderate': 'Moderate',
-        'severe': 'Severe'
-        'unknown': 'Not documented'
-    }
-    comorbidities.add_argument('--ar', dest="vdinsufa", type=lambda x: valve_severity[x], metavar=list(valve_severity.keys()))
-    comorbidities.add_argument('--mr', dest="vdinsufm", type=lambda x: valve_severity[x], metavar=list(valve_severity.keys()))
-    comorbidities.add_argument('--tr', dest="vdinsuft", type=lambda x: valve_severity[x], metavar=list(valve_severity.keys()))
+    valve_severity = ['Trivial/Trace', 'Mild', 'Severe', 'Not documented', '']
+    assert data['vdinsufa'] in valve_severity
+    assert data['vdinsufm'] in valve_severity
+    assert data['vdinsuft'] in valve_severity
 
-      "vdaoprimet": "Congenital (other than Bicuspid, Unicuspid, or Quadricuspid)",
+    #  "vdaoprimet": "Congenital (other than Bicuspid, Unicuspid, or Quadricuspid)",
 
-    incidence_dict = {
-        'first': 'First cardiovascular surgery',
-        'reop': 'First re-op cardiovascular surgery',
-        'second-reop': 'Second re-op cardiovascular surgery',
-        'third-reop': 'Third re-op cardiovascular surgery',
-        'fourth-reop': 'Fourth or more re-op cardiovascular surgery'
-        'na': 'NA - Not a cardiovascular surgery'
-    }
-    comorbidities.add_argument('--incidence', dest="incidenc", type=lambda x: incidence_dict[x], metavar=list(incidence_dict.keys()))
+    assert data['incidenc'] in ['First cardiovascular surgery', 'First re-op cardiovascular surgery', 'Second re-op cardiovascular surgery',
+                                'Third re-op cardiovascular surgery', 'Fourth or more re-op cardiovascular surgery', 'NA - Not a cardiovascular surgery', '']
+
+    assert data['status'] in ['Elective', 'Urgent', 'Emergent', 'Emergent Salvage', '']
+
+    assert data['iabpwhen'] in ['Preop', 'Intraop', 'Postop', '']
+    assert data['cathbasassistwhen'] in ['Preop', 'Intraop', 'Postop', '']
+    
+    assert data['ecmowhen'] in ['Preop', 'Intraop', 'Postop', 'Non-operative', '']
+
+    return data
 
 
-    status_dict = {
-        'elective': 'Elective',
-        'urgent': 'Urgent',
-        'emergent': 'Emergent',
-        'emergent-salvage': 'Emergent Salvage',
-    }
-    comorbidities.add_argument('--status', dest="status", type=lambda x: status_dict[x], metavar=list(status_dict.keys()))
+def main():
+    """
+    Essentially all heavy lifting happens here -- the argparse parameters encode the right STS API variable names,
+    and then calls the minimalist query_sts_api() function to get the results.
 
-    optime_dict = {
-        'preop': 'Preop',
-        'intraop': 'Intraop',
-        'postop': 'Postop',
-    }
-    comorbidities.add_argument('--iabp', dest="iabpwhen", type=lambda x: optime_dict[x], metavar=list(optime_dict.keys()))
-    comorbidities.add_argument('--catheter-assist', dest="cathbasassistwhen", type=lambda x: optime_dict[x], metavar=list(optime_dict.keys()))
+    Note that the STS API is a little odd -- it requires *all* parameters to be passed (even if they're empty)
+    it includes oddities (race is sometimes "rac"), it does almost nothing client side (except BMI calculation?).
 
-    ecmowhen_dict = {
-        'preop': 'Preop',
-        'intraop': 'Intraop',
-        'postop': 'Postop',
-        'non-operative': 'Non-operative'
-    }
-    comorbidities.add_argument('--ecmo', dest="ecmowhen", type=lambda x: ecmowhen_dict[x], metavar=list(ecmowhen_dict.keys()))
+    If you use this code, please consider citing me and this repository.
+    """
+    parser = argparse.ArgumentParser(description="Query the STS Short-Term Risk Calculator (v4.2) via a CSV." +
+                                                 "\nPlease cite this repository if you're using in a publication.",
+                                     epilog="Written by Nick Semenkovich <semenko@alum.mit.edu> https://nick.semenkovich.com",
+                                     usage='%(prog)s [options]',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r'), required=True)
 
-
+    if len(sys.argv)==1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
     args = parser.parse_args()
-    print(vars(args))
-    # print(query_sts_api(vars(args)))
-    parser.print_help()
-    #print("Hello, %s!" % args.name)
 
+
+    print("Validating CSV entries.")
+    # NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
+    # and your CSV entries must *exactly* match the STS query parameters.
+
+    validated_patient_data = []
+
+    csv_dictreader = csv.DictReader(args.csv_file)
+    for row in csv_dictreader:
+        print(f"\tID: {row['id']}", end='')
+        validated_patient_data.append(validate_and_return_csv_data(row))
+        print(' OK.')
+
+
+    print("Querying STS API.")
+    # Query the API for all CSV entries
+    for entry in validated_patient_data:
+        print(f"ID: {entry['id']}")
+        del entry['id']
+        print(query_sts_api(entry))
+        break
+
+    print("Done.")
 
 if __name__ == '__main__':
     main()
