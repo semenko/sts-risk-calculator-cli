@@ -52,7 +52,7 @@ def query_sts_api(sts_query_dict):
         2)
 
     response = requests.post(url=STS_API_URL, json=sts_query_dict)
-    time.sleep(1)
+    time.sleep(0.5)
 
     if response.status_code != requests.codes.ok:
         raise Exception("STS API returned status code %d" % response.status_code)
@@ -77,7 +77,10 @@ def validate_and_return_csv_data(csv_entry):
    # assert all(key in data.keys() for key in STS_PARAMS_REQUIRED)
 
     # Check the parameters are all allowable
-    assert all(key in STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL for key in csv_entry.keys()), "You have a column that's not one of the defined STS keys."
+    provided_keys = csv_entry.keys()
+    valid_keys = STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL
+    key_difference = set(provided_keys) - set(valid_keys)
+    assert len(key_difference) == 0, f"You have one or more columns that are not defined STS keys: {key_difference}"
 
     # Union of these two dicts, overwriting keys from the user supplied CSV entries where able
     data = STS_QUERY_STUB | csv_entry
@@ -115,13 +118,14 @@ def validate_and_return_csv_data(csv_entry):
     if data['payorsecond'] != "":
         assert data['payorprim'] != ""
 
-    datetime.datetime.strptime(data['surgdt'], "%m/%d/%Y")
+    # TODO: Double check the STS API handles 0 padding
+    data['surgdt'] = datetime.datetime.strptime(data['surgdt'], "%m/%d/%Y").strftime('%m/%d/%Y')
 
     ## Biometrics
 
     # We require weight/height for BMI calc later
-    assert (int(data['weightkg']) in range(10,251))
-    assert (int(data['heightcm']) in range(20, 252))
+    assert 10 <= float(data['weightkg']) <= 250
+    assert 20 <= float(data['heightcm']) <= 251
 
     assert (data['hct'] == "") or (1 <= int(data['hct']) <= 100)
     assert (data['wbc'] == "") or (0.1 <= float(data['wbc']) <= 100)
@@ -221,7 +225,6 @@ def validate_and_return_csv_data(csv_entry):
     
     assert data['medinotr'] in yes_or_empty
 
-    # TODO: Fix
     # NOTE: The API allows more complex values here (contraindicated / unknown), which we ignore.  Yes/No/Empty.
     assert data['medadp5days'] in yes_or_empty
     assert data['medadpidis'] in yes_or_empty # ????
@@ -239,7 +242,7 @@ def validate_and_return_csv_data(csv_entry):
     # Left main > 50%
     assert data['laddiststenpercent'] in ['50 - 69%', '>=70%', '']
 
-    assert (data['hdef'] == '') or  (1.0 <= float(hdef) <= 99.0)
+    assert (data['hdef'] == '') or (1.0 <= float(data['hdef']) <= 99.0)
     # AS & MS
     assert data['vdstena'] in yes_or_empty
     assert data['vdstenm'] in yes_or_empty
@@ -320,7 +323,7 @@ def main():
                                      usage='%(prog)s [options]',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r'), required=True)
+    parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r', encoding='utf-8-sig'), required=True)
 
     parser.add_argument('--dry-run', dest='dryrun', action="store_true", help="Only validate data, do not query the STS API.")
 
@@ -339,10 +342,12 @@ def main():
         for entry in args.override:
             split_entry = entry.split("=")
             assert len(split_entry) == 2, "Can't handle multiple = in override value."
-            assert split_entry[1] != "id", "Cannot override patient ID."
+            assert split_entry[0] != "id", "Cannot override patient ID."
             override_dict[split_entry[0]] = split_entry[1]
-
+        
         assert all(key in STS_PARAMS_REQUIRED + STS_PARAMS_OPTIONAL for key in override_dict.keys()), "Override value is not one of the defined STS keys."
+        print(f"\tOverriding: {override_dict}")
+
 
     print("Validating CSV entries.")
     # NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
