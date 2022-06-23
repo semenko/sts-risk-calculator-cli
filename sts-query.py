@@ -39,12 +39,18 @@ STS_PARAMS_REQUIRED = ["age", "gender", "raceasian", "raceblack", "racenativeam"
 STS_QUERY_STUB = {key:'' for key in STS_PARAMS_REQUIRED}
 
 # The optional API parameters
-# TODO: Add all other params
+# TODO: Add all other optional params from STS? Is the above actually exhaustive?
 STS_PARAMS_OPTIONAL = ["id"] # ID is an internal parameter we allow
 
 STS_EXPECTED_RESULTS = ["predmort","predmm","preddeep","pred14d","predstro","predvent","predrenf","predreop","pred6d"]
 
 def query_sts_api(sts_query_dict):
+    """
+    Encode a dict as .json and pass it to the STS API with a small delay.
+
+    Input: a dict of STS query parameters:
+    Outout: the STS results dict
+    """
     # The STS client side computes BMI (why?)
     sts_query_dict['calculatedbmi'] = round(
         (float(sts_query_dict['weightkg']) /
@@ -52,7 +58,7 @@ def query_sts_api(sts_query_dict):
         2)
 
     response = requests.post(url=STS_API_URL, json=sts_query_dict)
-    time.sleep(0.5)
+    time.sleep(0.2)
 
     if response.status_code != requests.codes.ok:
         raise Exception("STS API returned status code %d" % response.status_code)
@@ -66,12 +72,14 @@ def query_sts_api(sts_query_dict):
 
 def validate_and_return_csv_data(csv_entry):
     """
-    Validate the dict we're about to pass to the STS API.
+    Extensively validate the dict we're about to pass to the STS API.
 
-    NOTE: We perform some validation, but it's not complete.
+    Note that we validate ~most fields, but not all prior procedures if those are entered.
+
+    (Please open a Github issue if you find a problem with your data validation.)
 
     Input: patient_data (dict)
-    Output: returns an entry that passed validation
+    Output: returns a dict that passed validation, union with the STS_QUERY_STUB
     """
     # Check the required parameters are present
    # assert all(key in data.keys() for key in STS_PARAMS_REQUIRED)
@@ -85,115 +93,123 @@ def validate_and_return_csv_data(csv_entry):
     # Union of these two dicts, overwriting keys from the user supplied CSV entries where able
     data = STS_QUERY_STUB | csv_entry
 
+    # Procedure
     procedure_dict = {
         'CAB': '1',
         'AVR': '2',
         'MVR': '3',
         'AVR+CAB': '4',
         'MVR+CAB': '5',
-        'MVRepair': '6',
-        'MVRepair+CAB': '7',
+        # There's no 6 ?!
+        'MVRepair': '7',
+        'MVRepair+CAB': '8',
     }
-    assert data['procid'] in procedure_dict.values()
+    assert data['procid'] in procedure_dict.values(), "Invalid procid"
 
-    assert int(data['age']) in range(1,111)
-    assert data['gender'] in ['Male', 'Female', '']
+    # Key Patient Data
+    assert int(data['age']) in range(1,111), "Invalid age"
+    assert data['gender'] in ['Male', 'Female', ''], "Invalid gender"
 
     yes_or_empty = ['Yes', '']
+
     ## Race/Ethnicity Parameters
-    assert data['raceasian'] in yes_or_empty
-    assert data['raceblack'] in yes_or_empty
-    assert data['racenativeam'] in yes_or_empty
+    assert data['raceasian'] in yes_or_empty, "Invalid raceasian"
+    assert data['raceblack'] in yes_or_empty, "Invalid raceblack"
+    assert data['racenativeam'] in yes_or_empty, "Invalid racenativeam"
     # Missing an "e" in race -- on STS's end.
-    assert data['racnativepacific'] in yes_or_empty
+    assert data['racnativepacific'] in yes_or_empty, "Invalid racnativepacific"
     # Hispanic/latino
-    assert data['ethnicity'] in yes_or_empty
+    assert data['ethnicity'] in yes_or_empty, "Invalid ethnicity"
 
 
     ## Patient Metadata
     payors = ['None / self', 'Medicare (includes commercially managed options)', 'Medicaid (includes commercially managed options)',
      'Commercial Health Insurance', 'Health Maintenance Organization', 'Non-U.S. Plan', 'Other', '']
-    assert data['payorprim'] in payors
-    assert data['payorsecond'] in payors
+    assert data['payorprim'] in payors, "Invalid payorprim"
+    assert data['payorsecond'] in payors, "Invalid payorsecond"
     if data['payorsecond'] != "":
-        assert data['payorprim'] != ""
+        assert data['payorprim'] != "", "If payorsecond is set, payorprim must also be set"
 
     # TODO: Double check the STS API handles 0 padding
     data['surgdt'] = datetime.datetime.strptime(data['surgdt'], "%m/%d/%Y").strftime('%m/%d/%Y')
 
     ## Biometrics
-
     # We require weight/height for BMI calc later
-    assert 10 <= float(data['weightkg']) <= 250
-    assert 20 <= float(data['heightcm']) <= 251
+    assert 10 <= float(data['weightkg']) <= 250, "Invalid weightkg"
+    assert 20 <= float(data['heightcm']) <= 251, "Invalid heightcm"
 
-    assert (data['hct'] == "") or (1 <= int(data['hct']) <= 100)
-    assert (data['wbc'] == "") or (0.1 <= float(data['wbc']) <= 100)
-    assert (data['platelets'] == "") or (int(data['platelets']) in range(1000, 900001))
-    assert (data['creatlst'] == "") or (0.10 <= float(data['creatlst']) <= 30)
+    ## Labs
+    assert (data['hct'] == "") or (1 <= int(data['hct']) <= 100), "Invalid hct"
+    assert (data['wbc'] == "") or (0.1 <= float(data['wbc']) <= 100), "Invalid wbc"
+    assert (data['platelets'] == "") or (int(data['platelets']) in range(1000, 900001)), "Invalid platelets"
+    assert (data['creatlst'] == "") or (0.10 <= float(data['creatlst']) <= 30), "Invalid creatlst"
 
     ## Comorbidities
-    assert data['dialysis'] in yes_or_empty
-    assert data['hypertn'] in yes_or_empty
-    assert data['immsupp'] in yes_or_empty
-    assert data['pvd'] in yes_or_empty
+    assert data['dialysis'] in yes_or_empty, "Invalid dialysis"
+    assert data['hypertn'] in yes_or_empty, "Invalid hypertn"
+    assert data['immsupp'] in yes_or_empty, "Invalid immsupp"
+    assert data['pvd'] in yes_or_empty, "Invalid pvd"
 
-    assert data['cvd'] in yes_or_empty
-    assert data['cvdtia'] in yes_or_empty
-    assert data['cvdpcarsurg'] in yes_or_empty
+    assert data['cvd'] in yes_or_empty, "Invalid cvd"
+    assert data['cvdtia'] in yes_or_empty, "Invalid cvdtia"
+    assert data['cvdpcarsurg'] in yes_or_empty, "Invalid cvdpcarsurg"
 
     if data['cvdtia'] != '' or data['cvdpcarsurg'] != '':
-        assert data['cvd'] == 'Yes', "cvd must be set if a TIA or prior cartoid procedure is true."
+        assert data['cvd'] == 'Yes', "Invalid cvdpcarsurg, cvd must be set if a TIA or prior cartoid procedure is true."
 
-    assert data['cva'] in yes_or_empty
-    assert data['cvawhen'] in ['<= 30 days', '> 30 days', '']
+    assert data['cva'] in yes_or_empty, "Invalid cva"
+    assert data['cvawhen'] in ['<= 30 days', '> 30 days', ''], "Invalid when"
     if data['cvawhen'] != '':
-        assert data['cva'] != ''
+        assert data['cva'] != '', "Invalid cvawhen: cva must be set to Yes if cvdwhen is defined"
 
-    assert data['mediastrad'] in yes_or_empty
-    assert data['cancer'] in yes_or_empty
-    assert data['fhcad'] in yes_or_empty
-    assert data['slpapn'] in yes_or_empty
-    assert data['liverdis'] in yes_or_empty
-    assert data['unrespstat'] in yes_or_empty
-    assert data['syncope'] in yes_or_empty
+    assert data['mediastrad'] in yes_or_empty, "Invalid mediastrad"
+    assert data['cancer'] in yes_or_empty, "Invalid cancer"
+    assert data['fhcad'] in yes_or_empty, "Invalid fhcad"
+    assert data['slpapn'] in yes_or_empty, "Invalid slpapn"
+    assert data['liverdis'] in yes_or_empty, "Invalid liverdis"
+    assert data['unrespstat'] in yes_or_empty, "Invalid unrespstat"
+    assert data['syncope'] in yes_or_empty, "Invalid syncope"
 
-    assert data['diabetes'] in yes_or_empty
-    assert data['diabctrl'] in ['None', 'Diet only', 'Oral','Insulin', 'Other SubQ', 'Other', 'Unknown', '']
+    assert data['diabetes'] in yes_or_empty, "Invalid diabetes"
+    assert data['diabctrl'] in ['None', 'Diet only', 'Oral','Insulin', 'Other SubQ', 'Other', 'Unknown', ''], "Invalid diabctrl"
     if data['diabctrl'] != '':
-        assert data['diabetes'] != ''
+        assert data['diabetes'] != '', "Invalid diabctrl: diabetes must be set if diabctrl is set"
 
-    assert data['infendo'] in yes_or_empty
-    assert data['infendty'] in ['Treated', 'Active', '']
+    assert data['infendo'] in yes_or_empty, "Invalid infendo"
+    assert data['infendty'] in ['Treated', 'Active', ''], "Invalid infendty"
     if data['infendty'] != '':
-        assert data['infendo'] != ''
+        assert data['infendo'] != '', "Invalid infendty; infendo must be set if infendty is set"
 
-    assert data['chrlungd'] in ['No', 'Mild', 'Moderate', 'Severe', 'Lung disease documented, severity unknown', 'Unknown', '']
+    assert data['chrlungd'] in ['No', 'Mild', 'Moderate', 'Severe', 'Lung disease documented, severity unknown', 'Unknown', ''], "Invalid chrlungd"
  
     stenosis_pct = ['50% to 79%', '80% to 99%', '100%', 'Not documented', '']
-    assert data['cvdstenrt'] in stenosis_pct
-    assert data['cvdstenlft'] in stenosis_pct
+    assert data['cvdstenrt'] in stenosis_pct, "Invalid cvdstenrt"
+    assert data['cvdstenlft'] in stenosis_pct, "Invalid cvdstenlft"
 
-    assert data['ivdrugab'] in yes_or_empty
-    assert data['alcohol'] in ['<= 1 drink/week', '2-7 drinks/week', '>= 8 drinks/week', 'None', 'Unknown', '']
+    assert data['ivdrugab'] in yes_or_empty, "Invalid ivdrugab"
+    assert data['alcohol'] in ['<= 1 drink/week', '2-7 drinks/week', '>= 8 drinks/week', 'None', 'Unknown', ''], "Invalid alcohol"
 
-    assert data['pneumonia'] in ['Recent', 'Remote', 'No', 'Unknown', '']
+    assert data['pneumonia'] in ['Recent', 'Remote', 'No', 'Unknown', ''], "Invalid pneumonia"
 
-    assert data['tobaccouse'] in ['Never smoker', 'Current every day smoker', 'Current some day smoker', 'Smoker, current status (frequency) unknown', 'Former smoker', 'Smoking status unknown', '']
+    assert data['tobaccouse'] in ['Never smoker', 'Current every day smoker', 'Current some day smoker', 'Smoker, current status (frequency) unknown', 'Former smoker', 'Smoking status unknown', ''], "Invalid tobaccouse"
 
-    assert data['hmo2'] in ['Yes, PRN', 'Yes, oxygen dependent', 'No', 'Unknown', '']
+    assert data['hmo2'] in ['Yes, PRN', 'Yes, oxygen dependent', 'No', 'Unknown', ''], "Invalid hmo2"
 
-    # Not Validated Yet
+    ## Previous interventions
+    assert data['prcvint'] in yes_or_empty, "Invalid prcvint"
+
+    assert data['prcab'] in yes_or_empty, "Invalid prcab" # cabg
+    assert data['prvalve'] in yes_or_empty, "Invalid prvalve" # valve
+    assert data['poc'] in yes_or_empty, "Invalid poc" # other cardiac
+    assert data['pocpci'] in yes_or_empty, "Invalid pocpci" # pci
+    
+    ## Details of previous procedures are not validated yet
     """
-    "prcvint": "Yes",
-    "prcab": "",
-    "prvalve": "",
     "prvalveproc1": "",
     "prvalveproc2": "",
     "prvalveproc3": "",
     "prvalveproc4": "",
     "prvalveproc5": "",
-    "poc": "",
     "pocint1": "",
     "pocint2": "",
     "pocint3": "",
@@ -201,58 +217,60 @@ def validate_and_return_csv_data(csv_entry):
     "pocint5": "",
     "pocint6": "",
     "pocint7": "",
-    "pocpci": "",
     "pocpciwhen": "",
     "pocpciin": "",
     """
     
-    assert data['miwhen'] in ['<=6 Hrs', '>6 Hrs but <24 Hrs', '1 to 7 Days', '8 to 21 Days', '>21 Days', '']
-    assert data['heartfailtmg'] in ['Acute', 'Chronic', 'Both', '']
+    assert data['miwhen'] in ['<=6 Hrs', '>6 Hrs but <24 Hrs', '1 to 7 Days', '8 to 21 Days', '>21 Days', ''], "Invalid miwhen"
+    assert data['heartfailtmg'] in ['Acute', 'Chronic', 'Both', ''], "Invalid heartfailtmg"
 
-    assert data['classnyh'] in ['Class I', 'Class II', 'Class III','Class IV', 'Not documented', '']
+    assert data['classnyh'] in ['Class I', 'Class II', 'Class III','Class IV', 'Not documented', ''], "Invalid classnyh"
 
+    # Angina sx not yet validated
     #  "cardsymptimeofadm": "Stable Angina",
 
-    assert data['carshock'] in ['Yes - At the time of the procedure', 'Yes, not at the time of the procedure but within prior 24 hours', '']
+    assert data['carshock'] in ['Yes - At the time of the procedure', 'Yes, not at the time of the procedure but within prior 24 hours', ''], "Invalid carshock"
     
     rhythm_onset = ['None', 'Remote (> 30 days preop)', 'Recent (<= 30 days preop)', '']
-    assert data['arrhythatrfib'] in rhythm_onset
-    assert data['arrhythaflutter'] in rhythm_onset
-    assert data['arrhyththird'] in rhythm_onset
-    assert data['arrhythsecond'] in rhythm_onset
-    assert data['arrhythsss'] in rhythm_onset
-    assert data['arrhythvv'] in rhythm_onset
-    
-    assert data['medinotr'] in yes_or_empty
+    assert data['arrhythatrfib'] in rhythm_onset, "Invalid arrhythatrfib"
+    assert data['arrhythaflutter'] in rhythm_onset, "Invalid arrhythaflutter"
+    assert data['arrhyththird'] in rhythm_onset, "Invalid arrhyththird"
+    assert data['arrhythsecond'] in rhythm_onset, "Invalid arrhythsecond"
+    assert data['arrhythsss'] in rhythm_onset, "Invalid arrhythsss"
+    assert data['arrhythvv'] in rhythm_onset, "Invalid arrhythvv"
 
-    # NOTE: The API allows more complex values here (contraindicated / unknown), which we ignore.  Yes/No/Empty.
-    assert data['medadp5days'] in yes_or_empty
-    assert data['medadpidis'] in yes_or_empty # ????
+    ## Medications    
+    assert data['medinotr'] in yes_or_empty, "Invalid medinotr" # Inotropes
 
-    assert data['medacei48'] in yes_or_empty
-    assert data['medbeta'] in yes_or_empty
-    assert data['medster'] in yes_or_empty
-    assert data['medgp'] in yes_or_empty
+    # NOTE: The API allows contraindicated & unknown, which we ignore.  Yes/No/Empty.
+    assert data['medadp5days'] in yes_or_empty, "Invalid medadp5days" # ADPi
+    assert 1<= int(float(data['medadpidis'])) <= 5, "Invalid medadpidis"
 
-    assert data['resusc'] in ['Yes - Within 1 hour of the start of the procedure', 'Yes - More than 1 hour but less than 24 hours of the start of the procedure', '']
+    assert data['medacei48'] in yes_or_empty, "Invalid medacei48" # ACE
+    assert data['medbeta'] in yes_or_empty, "Invalid medbeta" # BB
+    assert data['medster'] in yes_or_empty, "Invalid medster" # Steroids
+    assert data['medgp'] in yes_or_empty, "Invalid medgp" #GP2B3A
+
+    assert data['resusc'] in ['Yes - Within 1 hour of the start of the procedure', 'Yes - More than 1 hour but less than 24 hours of the start of the procedure', ''], "Invalid resusc"
 
     # Why is this not an int?!!
-    assert data['numdisv'] in ['None', 'One', 'Two', 'Three', '']
-    assert data['stenleftmain'] in ['Yes', 'No', 'N/A', '']
+    assert data['numdisv'] in ['None', 'One', 'Two', 'Three', ''], "Invalid numdisv"
+    assert data['stenleftmain'] in ['Yes', 'No', 'N/A', ''], "Invalid stenleftmain"
     # Left main > 50%
-    assert data['laddiststenpercent'] in ['50 - 69%', '>=70%', '']
+    assert data['laddiststenpercent'] in ['50 - 69%', '>=70%', ''], "Invalid laddiststenpercent"
 
-    assert (data['hdef'] == '') or (1.0 <= float(data['hdef']) <= 99.0)
-    # AS & MS
-    assert data['vdstena'] in yes_or_empty
-    assert data['vdstenm'] in yes_or_empty
+    # EF
+    assert (data['hdef'] == '') or (1.0 <= float(data['hdef']) <= 99.0), "Invalid hdef"
+    
+    ## Valves
+    assert data['vdstena'] in yes_or_empty, "Invalid vdstena" # AS
+    assert data['vdstenm'] in yes_or_empty, "Invalid vdstenm" # MS
 
     valve_severity = ['Trivial/Trace', 'Mild', 'Moderate', 'Severe', 'Not documented', '']
-    assert data['vdinsufa'] in valve_severity
-    assert data['vdinsufm'] in valve_severity
-    assert data['vdinsuft'] in valve_severity
+    assert data['vdinsufa'] in valve_severity, "Invalid vdinsufa" # AI
+    assert data['vdinsufm'] in valve_severity, "Invalid vdinsufm" # MR
+    assert data['vdinsuft'] in valve_severity, "Invalid vdinsuft" # TR
 
-    # We don't validate all these options:
     valve_indications = ["Bicuspid valve disease",
         "Unicuspid valve disease",
         "Quadricuspid valve disease",
@@ -292,17 +310,17 @@ def validate_and_return_csv_data(csv_entry):
         "Mixed Etiology",
         "Not documented",
         ""]
-    assert data['vdaoprimet'] in valve_indications
+    assert data['vdaoprimet'] in valve_indications, "Invalid vdaoprimet"
 
     assert data['incidenc'] in ['First cardiovascular surgery', 'First re-op cardiovascular surgery', 'Second re-op cardiovascular surgery',
-                                'Third re-op cardiovascular surgery', 'Fourth or more re-op cardiovascular surgery', 'NA - Not a cardiovascular surgery', '']
+                                'Third re-op cardiovascular surgery', 'Fourth or more re-op cardiovascular surgery', 'NA - Not a cardiovascular surgery', ''], "Invalid incidenc"
 
-    assert data['status'] in ['Elective', 'Urgent', 'Emergent', 'Emergent Salvage', '']
+    assert data['status'] in ['Elective', 'Urgent', 'Emergent', 'Emergent Salvage', ''], "Invalid status"
 
-    assert data['iabpwhen'] in ['Preop', 'Intraop', 'Postop', '']
-    assert data['cathbasassistwhen'] in ['Preop', 'Intraop', 'Postop', '']
+    assert data['iabpwhen'] in ['Preop', 'Intraop', 'Postop', ''], "Invalid iabpwhen"
+    assert data['cathbasassistwhen'] in ['Preop', 'Intraop', 'Postop', ''], "Invalid cathbasassistwhen"
     
-    assert data['ecmowhen'] in ['Preop', 'Intraop', 'Postop', 'Non-operative', '']
+    assert data['ecmowhen'] in ['Preop', 'Intraop', 'Postop', 'Non-operative', ''], "Invalid ecmowhen"
 
     return data
 
@@ -335,9 +353,10 @@ def main():
         sys.exit(1)
     args = parser.parse_args()
 
+    ## Parse potential override values, which will take priority over anything passed in the .csv
     override_dict = {}
     if args.override:
-        print("NOTE: Override values supplied -- these will be sent to the STS API, instead of the values in your .csv")
+        print("NOTE: Override values supplied -- these will be sent to the STS API instead of the values in your .csv")
 
         for entry in args.override:
             split_entry = entry.split("=")
@@ -349,7 +368,7 @@ def main():
         print(f"\tOverriding: {override_dict}")
 
 
-    print("Validating CSV entries.")
+    print("Validating CSV entries...")
     # NOTE: Other than an "ID" column your CSV header must be the same as the STS API parameters,
     # and your CSV entries must *exactly* match the STS query parameters.
 
@@ -357,12 +376,14 @@ def main():
 
     csv_dictreader = csv.DictReader(args.csv_file)
     for row in csv_dictreader:
-        print(f"\tPatient ID: {row['id']}", end='')
         overriden_row = row | override_dict
-        validated_patient_data.append(validate_and_return_csv_data(overriden_row))
-        print(' OK.')
+        try:
+            validated_patient_data.append(validate_and_return_csv_data(overriden_row))
+        except AssertionError as error_val:
+            print(f"Error in Patient ID: {row['id']}: {error_val}")
+    print('Valid!\n')
 
-
+    ## Actually query the STS API (if not a dry run)
     if not args.dryrun:
         # A dict of patient_id to the STS risk values
         # e.g. '1': {pred6d: 0.37929, pred14d: 0.04021 …}
@@ -390,7 +411,7 @@ def main():
 
         print(f"\nDone!\nResults written to: {result_filename}")
     else:
-        print(f"Data valid! (Dry run requested, STS API not queried.)")
+        print(f"(Dry run requested, STS API not queried.)")
 
 if __name__ == '__main__':
     main()
