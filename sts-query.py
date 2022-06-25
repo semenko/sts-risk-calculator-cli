@@ -355,7 +355,7 @@ def main():
         sys.exit(1)
     args = parser.parse_args()
 
-    assert not os.path.exists(args.output_csv_file), "Error: Output file already exists! {args.output_csv_file}"
+    assert not os.path.exists(args.output_csv_file), f"Output file already exists: {args.output_csv_file}"
 
     ## Parse potential override values, which will take priority over anything passed in the .csv
     override_dict = {}
