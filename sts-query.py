@@ -12,8 +12,7 @@
 import argparse
 import csv
 import datetime
-from distutils.log import error
-from pydoc import describe
+import os
 import sys
 import time
 
@@ -342,9 +341,11 @@ def main():
                                      usage='%(prog)s [options]',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r', encoding='utf-8-sig'), required=True)
+    parser.add_argument('--csv', dest='csv_file', metavar='patient-data.csv', type=argparse.FileType('r', encoding='utf-8-sig'), required=True, help="Your input patient data .csv.")
 
     parser.add_argument('--dry-run', dest='dryrun', action="store_true", help="Only validate data, do not query the STS API.")
+
+    parser.add_argument('--output', dest='output_csv_file', metavar='results.csv', type=str, help='Where to store results.', default='results.csv')
 
     parser.add_argument('--override', dest='override', nargs='+', help='Optionally override values sent to the STS API. ' +
     'For example, set all patients to the same age with --override age=50', metavar='stsvariable=value')
@@ -353,6 +354,8 @@ def main():
         parser.print_help(sys.stderr)
         sys.exit(1)
     args = parser.parse_args()
+
+    assert not os.path.exists(args.output_csv_file), "Error: Output file already exists! {args.output_csv_file}"
 
     ## Parse potential override values, which will take priority over anything passed in the .csv
     override_dict = {}
@@ -397,7 +400,7 @@ def main():
         # e.g. '1': {pred6d: 0.37929, pred14d: 0.04021 …}
         sts_results = {}
 
-        print("\nQuerying STS API.")
+        print("Querying STS API.")
         # Query the API for all CSV entries
         for entry in tqdm.tqdm(validated_patient_data):
             patient_id = entry['id']
@@ -407,9 +410,7 @@ def main():
             assert(patient_id not in sts_results), "Your patient IDs were not unique!"
             sts_results[patient_id] = query_sts_api(entry)
 
-        result_filename = 'results.csv'
-
-        with open(result_filename, 'w') as csv_output:
+        with open(args.output_csv_file, 'w') as csv_output:
             writer = csv.DictWriter(csv_output, fieldnames=['id'] + STS_EXPECTED_RESULTS)
             writer.writeheader()
             for patient_id, patient_results in sts_results.items():
@@ -417,7 +418,7 @@ def main():
                 patient_results['id'] = patient_id
                 writer.writerow(patient_results)
 
-        print(f"\nDone!\nResults written to: {result_filename}")
+        print(f"\nDone!\nResults written to: {args.output_csv_file}")
     else:
         print(f"(Dry run requested, STS API not queried.)")
 
