@@ -12,6 +12,7 @@
 import argparse
 import csv
 import datetime
+from distutils.log import error
 from pydoc import describe
 import sys
 import time
@@ -244,7 +245,7 @@ def validate_and_return_csv_data(csv_entry):
 
     # NOTE: The API allows contraindicated & unknown, which we ignore.  Yes/No/Empty.
     assert data['medadp5days'] in yes_or_empty, "Invalid medadp5days" # ADPi
-    assert 1<= int(float(data['medadpidis'])) <= 5, "Invalid medadpidis"
+    assert (data['medadpidis'] == "") or 1<= int(float(data['medadpidis'])) <= 5, "Invalid medadpidis"
 
     assert data['medacei48'] in yes_or_empty, "Invalid medacei48" # ACE
     assert data['medbeta'] in yes_or_empty, "Invalid medbeta" # BB
@@ -375,13 +376,20 @@ def main():
     validated_patient_data = []
 
     csv_dictreader = csv.DictReader(args.csv_file)
-    for row in csv_dictreader:
+    errors_exist = False
+    for line_num, row in enumerate(csv_dictreader, start=1):
         overriden_row = row | override_dict
         try:
+            assert(row['id']) != '', "No ID exists for this row. (Is it empty?)"
             validated_patient_data.append(validate_and_return_csv_data(overriden_row))
-        except AssertionError as error_val:
-            print(f"Error in Patient ID: {row['id']}: {error_val}")
-    print('Valid!\n')
+        except (AssertionError, ValueError) as error_val:
+            print(f"\tError in .csv line: {line_num}, patient ID: {row['id']}: {error_val}")
+            errors_exist = True
+    if errors_exist:
+        print('Errors exist in your input .csv, unable to query STS API.')
+        sys.exit()
+    else:
+        print('Valid!\n')
 
     ## Actually query the STS API (if not a dry run)
     if not args.dryrun:
