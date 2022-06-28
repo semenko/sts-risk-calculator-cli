@@ -202,7 +202,7 @@ def validate_and_return_csv_data(csv_entry):
     assert data['prvalve'] in yes_or_empty, "Invalid prvalve" # valve
     assert data['poc'] in yes_or_empty, "Invalid poc" # other cardiac
     assert data['pocpci'] in yes_or_empty, "Invalid pocpci" # pci
-    
+
     ## Details of previous procedures are not validated yet
     """
     "prvalveproc1": "",
@@ -347,8 +347,8 @@ def main():
 
     parser.add_argument('--output', dest='output_csv_file', metavar='results.csv', type=str, help='Where to store results.', default='results.csv')
 
-    parser.add_argument('--override', dest='override', nargs='+', help='Optionally override values sent to the STS API. ' +
-    'For example, set all patients to the same age with --override age=50', metavar='stsvariable=value')
+    parser.add_argument('--override', dest='override', nargs='+', help='Override values sent to the STS API, e.g. ' +
+    'make all patients the same age with --override age=50', metavar='stsvariable=value')
 
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
