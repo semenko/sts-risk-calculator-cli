@@ -31,9 +31,9 @@ The STS Calculator itself is a black box — patient parameters are passed to th
 
 # Example Usage
 
-You must provide a CSV with a unique **id** per row, followed by a minimum of **procid**, **age**, **weightkg**, and **heightkg**.
+You must provide a CSV with a unique **id** per row, followed by a minimum of **procid**, **age**, **weightkg**, and **heightkg**. All other parameters are optional.
 
-All other parameters are optional. The most critical step is formatting your data to **exactly** match the STS risk parameter names & values (detailed below). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
+The most critical step is formatting your data to **exactly** match the STS risk parameter names & values ([detailed here](#sts-parameters)). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
 
 
 ### 1. Define input patient .csv (e.g. sample_data.csv)
@@ -98,7 +98,7 @@ This can be useful when comparing mortality predictions associated with populati
 # Citation & License
 If you use this in your publication, please consider citing this work as: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli**
 
-Released under the MIT License.  Copyright 2022, Nick Semenkovich <semenko@alum.mit.edu> https://nick.semenkovich.com/
+Released under the MIT License.  Copyright 2022, [Nick Semenkovich](https://nick.semenkovich.com/) \<semenko@alum.mit.edu\> 
 
 # STS Parameters
 
@@ -106,52 +106,52 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 
 | STS Field ID  | Description/Notes | Options
 | ----------- | ----------- | ----------- |
-| procid | Procedure ID (**Required**) | |
-| age | (**Required**) | |
+| procid | Procedure ID (**Required**) | {CAB: 1, AVR: 2, MVR: 3, AVR+CAB: 4, MVR+CAB: 5, None: 6, MVRepair: 7, MVRepair+CAB: 8} |
+| age | (**Required**) | 1-110 |
 | gender | | Male/Female/[Empty] |
 | raceasian | | Yes/[Empty] |
 | raceblack | | Yes/[Empty] |
 | racenativeam | | Yes/[Empty] |
 | racnativepacific | | Yes/[Empty] |
 | ethnicity | Hispanic, latino, or spanish ethnicity | Yes/[Empty] |
-| payorprim | Primary payor | |
+| payorprim | Primary payor | (see STS site: "None / self", …) |
 | payorsecond | Secondary payor (requires primary to be set) | … |
 | surgdt | Surgery date | as MM/DD/YYYY |
-| weightkg | (**Required**) | |
-| heightcm | (**Required**) | |
-| hct | | |
-| wbc | | |
-| platelets | | |
-| creatlst | | |
-| dialysis | | |
-| hypertn | | |
-| immsupp | | |
-| pvd | | |
-| cvd | | |
-| cvdtia | | |
-| cvdpcarsurg | | |
-| mediastrad | | |
-| cancer | | |
-| fhcad | | |
-| slpapn | | |
-| liverdis | | |
-| unrespstat | | |
-| syncope | | |
-| diabetes | | |
-| diabctrl | | |
-| infendo | | |
-| infendty | | |
-| cva | | |
-| cvawhen | | |
-| chrlungd | | |
-| cvdstenrt | | |
-| cvdstenlft | | |
-| ivdrugab | | |
-| alcohol | | |
-| pneumonia | | |
-| tobaccouse | | |
-| hmo2 | | |
-| prcvint | | |
+| weightkg | (**Required**) | 10-250 |
+| heightcm | (**Required**) | 20-251 |
+| hct | | 1-100 |
+| wbc | | 0.1-100 |
+| platelets | | 1000-90,000|
+| creatlst | Last creatinine | 0.10-30 |
+| dialysis | | Yes/[Empty] |
+| hypertn | | Yes/[Empty] |
+| immsupp | | Yes/[Empty] |
+| pvd | | Yes/[Empty] |
+| cvd | | Yes/[Empty] |
+| cvdtia | | Yes/[Empty] |
+| cvdpcarsurg | Prior carotid artery surgery/stenting | Yes/[Empty] |
+| mediastrad | Mediastinal radiation | Yes/[Empty] |
+| cancer | | Yes/[Empty] |
+| fhcad | | Yes/[Empty] |
+| slpapn | Sleep apnea | Yes/[Empty] |
+| liverdis | | Yes/[Empty] |
+| unrespstat | Unresponsive | Yes/[Empty] |
+| syncope | | Yes/[Empty] |
+| diabetes | | Yes/[Empty] |
+| diabctrl | |  (see STS site: "None", "Diet only" …) |
+| infendo | Infective endocarditis | Yes/[Empty] |
+| infendty | | Treated/Active |
+| cva | | Yes/[Empty] |
+| cvawhen | | (see STS site) |
+| chrlungd | Chronic lung disease | (see STS site) |
+| cvdstenrt | Right carotid stenosis | (see STS site) |
+| cvdstenlft | Left carotid stensosis| (see STS site) |
+| ivdrugab | Illicit drug use | Yes/[Empty] |
+| alcohol | | (see STS site) |
+| pneumonia | | (see STS site) |
+| tobaccouse | | (see STS site) |
+| hmo2 | Home O2 Use | (see STS site)  |
+| prcvint | Prior CV intervention | (see STS site) |
 | prcab | | |
 | prvalve | | |
 | prvalveproc1 | | |
@@ -182,13 +182,13 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | arrhythsecond | | |
 | arrhythsss | | |
 | arrhythvv | | |
-| medinotr | | |
+| medinotr | Inotropes | Yes/[Empty] |
 | medadp5days | | |
 | medadpidis | | |
-| medacei48 | | |
-| medbeta | | |
-| medster | | |
-| medgp | | |
+| medacei48 | ACE/ARB | |
+| medbeta | Beta blocker | |
+| medster | Steroids | |
+| medgp | | Yes/[Empty] |
 | resusc | | |
 | numdisv | | |
 | stenleftmain | | |
