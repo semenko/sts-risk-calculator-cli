@@ -29,7 +29,9 @@ The STS Calculator itself is a black box — patient parameters are passed to th
 
 # Example Usage
 
-Procedure type and age are required (otherwise the STS calculator will return "NA" for everything). This script also requires `weightkg` and `heightcm`. All other parameters are optional.
+You must provide a CSV with a unique **id** per row, followed by a minimum of **procid**, **age**, **weightkg**, and **heightkg**.
+
+All other parameters are optional. The most critical step is formatting your data to **exactly** match the STS risk parameter names & values (detailed below). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
 
 
 ### 1. Define input patient .csv (e.g. sample_data.csv)
@@ -48,7 +50,7 @@ Validating CSV entries...
 Valid!
 
 Querying STS API.
-100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [00:01<00:00,  2.34it/s]
+100%|████████████████████████████████████████████████████████████████| 3/3 [00:01<00:00,  2.34it/s]
 
 Done!
 Results written to: sample_results.csv
@@ -69,7 +71,8 @@ id,predmort,predmm,preddeep,pred14d,predstro,predvent,predrenf,predreop,pred6d
 $ ./sts-query.py
 usage: sts-query.py [options]
 
-Query the STS Short-Term Risk Calculator (v4.2) via a CSV. Please cite this repository if you're using in a publication.
+Query the STS Short-Term Risk Calculator (v4.2) via a CSV.
+Please cite this repository if you're using in a publication.
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -78,8 +81,16 @@ optional arguments:
   --dry-run             Only validate data, do not query the STS API. (default: False)
   --output results.csv  Where to store results. (default: results.csv)
   --override stsvariable=value [stsvariable=value ...]
-                        Override values sent to the STS API, e.g. make all patients the same age with --override age=50 (default: None)
+                        Override values sent to the STS API,
+                        e.g. make all patients the same age with --override age=50 (default: None)
 ```
+
+# Override Parameters
+
+Using the `--override` flag, you can provide parameters to the STS API that override or fill in missing data in your .csv. For example, you can pass `--override age=50` to set the age of *all* patients to 50. You can provide multiple values, for example `--override dialysis=Yes procid=2` will set every patient on dialysis and set the `procid` to 2 (AVR).
+
+This can be useful when comparing mortality predictions associated with population-level interventions. For example, you can ask: *What if all these patients stopped smoking?* or *What if everyone had good diabetes control?*
+
 
 
 # Citation
