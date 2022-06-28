@@ -15,9 +15,9 @@ Repeatedly query the Society of Thoracic Surgeons Adult Cardiac Risk Calculator 
 
 
 # Overview
-This is a minimalist Python command line tool to query the STS risk calculator with bulk patient records. There is no upper limit to your query size -- this has been successfully run on datasets of ~500+ patients. 
+This is a minimalist Python command line tool to query the STS risk calculator with bulk patient records. This returns all available mortality and complication data from the STS. There is no upper limit to your query size -- this has been successfully run on datasets of ~500+ patients. 
 
-The STS Calculator itself is a black box — patient parameters are passed to the STS API and a risk is returned (almost no computing happens client side).  A few obvious parameters impact mortality heavily (e.g. ESRD). Unfortunately, the risk calculator somewhat randomly changes its input parameters every few years. This code was inspired in part by [this script](https://github.com/aguirre-lab/sts-ml/blob/main/scripts/query_sts_calculator.py) and by [this documentation](https://github.com/mstubna/STS-Calculator).
+The STS Calculator itself is a black box — patient parameters are passed to the STS API and a risk is returned (almost no computing happens client side).  A few obvious parameters impact mortality heavily (e.g. ESRD).
 
 
 ## Features
@@ -52,7 +52,7 @@ Validating CSV entries...
 Valid!
 
 Querying STS API.
-100%|████████████████████████████████████████████████████████████████| 3/3 [00:01<00:00,  2.34it/s]
+100%|█████████████████████████████████████████████████████████████| 3/3 [00:01<00:00,  2.34it/s]
 
 Done!
 Results written to: sample_results.csv
@@ -95,8 +95,114 @@ This can be useful when comparing mortality predictions associated with populati
 
 
 
-# Citation
+# Citation & License
 If you use this in your publication, please consider citing this work as: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli**
 
-# License
 Released under the MIT License.  Copyright 2022, Nick Semenkovich <semenko@alum.mit.edu> https://nick.semenkovich.com/
+
+# STS Parameters
+
+The STS Risk Calculator version 4.2 defines these parameters. Note that the API is a bit sketchy: abbreviations are difficult to decipher and erratic (e.g. sometimes "race" is truncated to "rac"), and types are strange (sometimes fields want integers, while other times they want strings like "Two" …).
+
+| STS Field ID  | Description/Notes | Options
+| ----------- | ----------- | ----------- |
+| procid | Procedure ID (**Required**) | |
+| age | (**Required**) | |
+| gender | | Male/Female/[Empty] |
+| raceasian | | Yes/[Empty] |
+| raceblack | | Yes/[Empty] |
+| racenativeam | | Yes/[Empty] |
+| racnativepacific | | Yes/[Empty] |
+| ethnicity | Hispanic, latino, or spanish ethnicity | Yes/[Empty] |
+| payorprim | Primary payor | |
+| payorsecond | Secondary payor (requires primary to be set) | … |
+| surgdt | Surgery date | as MM/DD/YYYY |
+| weightkg | (**Required**) | |
+| heightcm | (**Required**) | |
+| hct | | |
+| wbc | | |
+| platelets | | |
+| creatlst | | |
+| dialysis | | |
+| hypertn | | |
+| immsupp | | |
+| pvd | | |
+| cvd | | |
+| cvdtia | | |
+| cvdpcarsurg | | |
+| mediastrad | | |
+| cancer | | |
+| fhcad | | |
+| slpapn | | |
+| liverdis | | |
+| unrespstat | | |
+| syncope | | |
+| diabetes | | |
+| diabctrl | | |
+| infendo | | |
+| infendty | | |
+| cva | | |
+| cvawhen | | |
+| chrlungd | | |
+| cvdstenrt | | |
+| cvdstenlft | | |
+| ivdrugab | | |
+| alcohol | | |
+| pneumonia | | |
+| tobaccouse | | |
+| hmo2 | | |
+| prcvint | | |
+| prcab | | |
+| prvalve | | |
+| prvalveproc1 | | |
+| prvalveproc2 | | |
+| prvalveproc3 | | |
+| prvalveproc4 | | |
+| prvalveproc5 | | |
+| poc | | |
+| pocint1 | | |
+| pocint2 | | |
+| pocint3 | | |
+| pocint4 | | |
+| pocint5 | | |
+| pocint6 | | |
+| pocint7 | | |
+| pocpci | | |
+| pocpciwhen | | |
+| pocpciin | | |
+| miwhen | | |
+| heartfailtmg | | |
+| classnyh | | |
+| cardsymptimeofadm | | |
+| carshock | | |
+| arrhythatrfib | | |
+| arrhythafib | | |
+| arrhythaflutter | | |
+| arrhyththird | | |
+| arrhythsecond | | |
+| arrhythsss | | |
+| arrhythvv | | |
+| medinotr | | |
+| medadp5days | | |
+| medadpidis | | |
+| medacei48 | | |
+| medbeta | | |
+| medster | | |
+| medgp | | |
+| resusc | | |
+| numdisv | | |
+| stenleftmain | | |
+| laddiststenpercent | | |
+| hdef | | |
+| vdstena | | |
+| vdstenm | | |
+| vdinsufa | | |
+| vdinsufm | | |
+| vdinsuft | | |
+| vdaoprimet | | |
+| incidenc | | |
+| status | | |
+| iabpwhen | | |
+| cathbasassistwhen | | |
+| ecmowhen | | |
+| calculatedbmi | *Internally Calculated* | Do not provide this value. 
