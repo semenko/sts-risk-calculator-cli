@@ -1,3 +1,4 @@
+*.xlsx
 *.csv
 !sample_data.csv
 !sample_results.csv
