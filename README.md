@@ -8,9 +8,11 @@ Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://gith
 
 Repeatedly query the Society of Thoracic Surgeons Adult Cardiac Risk Calculator using bulk .csv patient data.
 
-</div>
 
 ![demo](./docs/demo.gif)
+
+</div>
+
 
 # Overview
 This is a minimalist Python command line tool to query the STS risk calculator with bulk patient records. There is no upper limit to your query size -- this has been successfully run on datasets of ~500+ patients. 
