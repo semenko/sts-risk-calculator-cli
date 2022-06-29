@@ -35,6 +35,13 @@ You must provide a CSV with a unique **id** per row, followed by a minimum of **
 
 The most critical step is formatting your data to **exactly** match the STS risk parameter names & values ([detailed here](#sts-parameters)). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
 
+### 0. Setup this script
+For example, on Mac, open the Terminal app and enter:
+```
+git clone https://github.com/semenko/sts-risk-calculator-cli
+cd sts-risk-calculator-cli
+pip install -r requirements.txt
+```
 
 ### 1. Define input patient .csv (e.g. sample_data.csv)
 ```
@@ -115,7 +122,7 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | racnativepacific | | Yes/[Empty] |
 | ethnicity | Hispanic, latino, or spanish ethnicity | Yes/[Empty] |
 | payorprim | Primary payor | *(see STS site: "None / self", …)* |
-| payorsecond | Secondary payor (requires primary to be set) | … |
+| payorsecond | Secondary payor (requires payorprim to be set) | … |
 | surgdt | Surgery date | as MM/DD/YYYY |
 | weightkg | (**Required**) | 10-250 |
 | heightcm | (**Required**) | 20-251 |
@@ -127,8 +134,8 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | hypertn | | Yes/[Empty] |
 | immsupp | | Yes/[Empty] |
 | pvd | | Yes/[Empty] |
-| cvd | | Yes/[Empty] |
-| cvdtia | | Yes/[Empty] |
+| cvd | **Cerebro**vascular disease | Yes/[Empty] |
+| cvdtia | Prior TIA (requires cva=Yes) | Yes/[Empty] |
 | cvdpcarsurg | Prior carotid artery surgery/stenting | Yes/[Empty] |
 | mediastrad | Mediastinal radiation | Yes/[Empty] |
 | cancer | | Yes/[Empty] |
@@ -138,7 +145,7 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | unrespstat | Unresponsive | Yes/[Empty] |
 | syncope | | Yes/[Empty] |
 | diabetes | | Yes/[Empty] |
-| diabctrl | Diabetes control |  (see STS site: "None", "Diet only" …) |
+| diabctrl | Diabetes control | *(see STS site: "None", "Diet only" …)* |
 | infendo | Infective endocarditis | Yes/[Empty] |
 | infendty | Endocarditis treatment status | Treated/Active |
 | cva | Prior CVA | Yes/[Empty] |
@@ -154,13 +161,13 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | prcvint | Prior CV intervention | *(see STS site)* |
 | prcab | Prior CABG | Yes/[Empty] |
 | prvalve | Prior valve | Yes/[Empty] |
-| prvalveproc1 | Prior procedure #1 type | *(see STS site)* |
+| prvalveproc1 | Prior valve procedure #1 type | *(see STS site)* |
 | prvalveproc2 | … | … |
 | prvalveproc3 | … | … |
 | prvalveproc4 | … | … |
 | prvalveproc5 | … | … |
 | poc | Prior other cardiac procedure | Yes/[Empty] |
-| pocint1 | Prior other cardiac procedue #1 | *(see STS site)* |
+| pocint1 | Prior other procedure #1 | *(see STS site: "Aortic valve balloon…")* |
 | pocint2 | … | … |
 | pocint3 | … | … |
 | pocint4 | … | … |
@@ -170,16 +177,16 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | pocpci | Prior PCI | Yes/[Empty] |
 | pocpciwhen | PCI within this episode of care | *(see STS site)*  |
 | pocpciin | PCI Interval | *(see STS site)*  |
-| miwhen | MI Timing | "<=6 Hrs", … *(see STS site)* |
+| miwhen | MI Timing | *(see STS site: "<=6 Hrs", … )* |
 | heartfailtmg | HF onset | Acute/Chronic/Both/[Empty]|
-| classnyh | HF class | "Class I" … *(see STS site)* |
-| cardsymptimeofadm | Symptoms on admission | "Stable angina" … *(see STS site)*  |
-| carshock | Shock at time of procedure | "Yes - At the time…"  … *(see STS site)* |
-| arrhythatrfib | Afib | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| classnyh | HF class | *(see STS site: "Class I" … )* |
+| cardsymptimeofadm | Symptoms on admission | *(see STS site: "Stable angina" …)*  |
+| carshock | Shock at time of procedure | *(see STS site: "Yes - At the time…" …)* |
+| arrhythatrfib | Afib | None / Remote (> 30 days preop) / Recent (<= 30 days preop) |
 | arrhythafib | Afib type  | Paroxysmal/Persistent |
-| arrhythaflutter | Aflutter | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
-| arrhyththird | 3rd deg AVB | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
-| arrhythsecond | 2nd deg AVB | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhythaflutter | Aflutter | None / Remote (> 30 days preop) / Recent (<= 30 days preop) |
+| arrhyththird | 3rd deg AVB | None / Remote (> 30 days preop) / Recent (<= 30 days preop) |
+| arrhythsecond | 2nd deg AVB | None / Remote (> 30 days preop) / Recent (<= 30 days preop) |
 | arrhythsss | SSS | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
 | arrhythvv | VF/VT | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
 | medinotr | Inotropes | Yes/[Empty] |
@@ -201,7 +208,7 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | vdinsuft | TR | Yes/[Empty] |
 | vdaoprimet | Valve indication | *(see STS site)*  |
 | incidenc | Incidence | *(see STS site)*  |
-| status | Status | Elective/Urgent/… *(see STS site)* |
+| status | Status | *(see STS site: Elective/Urgent/…)* |
 | iabpwhen | IABP Timing | Preop/Intraop/Postop/[Empty] |
 | cathbasassistwhen | Cath assist | Preop/Intraop/Postop/[Empty] |
 | ecmowhen | ECMO Timing |  Preop/Intraop/Postop/Non-operative/[Empty] |

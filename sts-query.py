@@ -179,7 +179,9 @@ def query_sts_api(sts_query_dict):
         k in STS_EXPECTED_RESULTS for k in sts_response.keys()
     ), f"API returned an unexpected value in: {sts_response.keys()}"
 
-    if not all([(0.0 <= sts_val <= 1.0) for sts_val in sts_response.values()]):
+    # NOTE: Some values can be empty -- e.g. predrenf (at least) is sometimes blank
+    # I choose to only validate overall mortality, which seems to always result.
+    if not (0.0 <= sts_response["predmort"] <= 1.0):
         print("NOTE: Odd numeric value returned by STS -- maybe your data are invalid.")
         print("Please double-check the results carefully, and open a GitHub issue if this occurs.")
 
