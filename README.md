@@ -114,7 +114,7 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | racenativeam | | Yes/[Empty] |
 | racnativepacific | | Yes/[Empty] |
 | ethnicity | Hispanic, latino, or spanish ethnicity | Yes/[Empty] |
-| payorprim | Primary payor | (see STS site: "None / self", …) |
+| payorprim | Primary payor | *(see STS site: "None / self", …)* |
 | payorsecond | Secondary payor (requires primary to be set) | … |
 | surgdt | Surgery date | as MM/DD/YYYY |
 | weightkg | (**Required**) | 10-250 |
@@ -138,71 +138,71 @@ The STS Risk Calculator version 4.2 defines these parameters. Note that the API 
 | unrespstat | Unresponsive | Yes/[Empty] |
 | syncope | | Yes/[Empty] |
 | diabetes | | Yes/[Empty] |
-| diabctrl | |  (see STS site: "None", "Diet only" …) |
+| diabctrl | Diabetes control |  (see STS site: "None", "Diet only" …) |
 | infendo | Infective endocarditis | Yes/[Empty] |
-| infendty | | Treated/Active |
-| cva | | Yes/[Empty] |
-| cvawhen | | (see STS site) |
-| chrlungd | Chronic lung disease | (see STS site) |
-| cvdstenrt | Right carotid stenosis | (see STS site) |
-| cvdstenlft | Left carotid stensosis| (see STS site) |
+| infendty | Endocarditis treatment status | Treated/Active |
+| cva | Prior CVA | Yes/[Empty] |
+| cvawhen | CVA timing | *(see STS site)* |
+| chrlungd | Chronic lung disease | *(see STS site)* |
+| cvdstenrt | Right carotid stenosis | *(see STS site)* |
+| cvdstenlft | Left carotid stensosis| *(see STS site)* |
 | ivdrugab | Illicit drug use | Yes/[Empty] |
-| alcohol | | (see STS site) |
-| pneumonia | | (see STS site) |
-| tobaccouse | | (see STS site) |
-| hmo2 | Home O2 Use | (see STS site)  |
-| prcvint | Prior CV intervention | (see STS site) |
-| prcab | | |
-| prvalve | | |
-| prvalveproc1 | | |
-| prvalveproc2 | | |
-| prvalveproc3 | | |
-| prvalveproc4 | | |
-| prvalveproc5 | | |
-| poc | | |
-| pocint1 | | |
-| pocint2 | | |
-| pocint3 | | |
-| pocint4 | | |
-| pocint5 | | |
-| pocint6 | | |
-| pocint7 | | |
-| pocpci | | |
-| pocpciwhen | | |
-| pocpciin | | |
-| miwhen | | |
-| heartfailtmg | | |
-| classnyh | | |
-| cardsymptimeofadm | | |
-| carshock | | |
-| arrhythatrfib | | |
-| arrhythafib | | |
-| arrhythaflutter | | |
-| arrhyththird | | |
-| arrhythsecond | | |
-| arrhythsss | | |
-| arrhythvv | | |
+| alcohol | EtOH Use | *(see STS site)* |
+| pneumonia | Pneumonia | *(see STS site)* |
+| tobaccouse | Smoking status | *(see STS site)* |
+| hmo2 | Home O2 Use | *(see STS site)* |
+| prcvint | Prior CV intervention | *(see STS site)* |
+| prcab | Prior CABG | Yes/[Empty] |
+| prvalve | Prior valve | Yes/[Empty] |
+| prvalveproc1 | Prior procedure #1 type | *(see STS site)* |
+| prvalveproc2 | … | … |
+| prvalveproc3 | … | … |
+| prvalveproc4 | … | … |
+| prvalveproc5 | … | … |
+| poc | Prior other cardiac procedure | Yes/[Empty] |
+| pocint1 | Prior other cardiac procedue #1 | *(see STS site)* |
+| pocint2 | … | … |
+| pocint3 | … | … |
+| pocint4 | … | … |
+| pocint5 | … | … |
+| pocint6 | … | … |
+| pocint7 | … | … |
+| pocpci | Prior PCI | Yes/[Empty] |
+| pocpciwhen | PCI within this episode of care | *(see STS site)*  |
+| pocpciin | PCI Interval | *(see STS site)*  |
+| miwhen | MI Timing | "<=6 Hrs", … *(see STS site)* |
+| heartfailtmg | HF onset | Acute/Chronic/Both/[Empty]|
+| classnyh | HF class | "Class I" … *(see STS site)* |
+| cardsymptimeofadm | Symptoms on admission | "Stable angina" … *(see STS site)*  |
+| carshock | Shock at time of procedure | "Yes - At the time…"  … *(see STS site)* |
+| arrhythatrfib | Afib | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhythafib | Afib type  | Paroxysmal/Persistent |
+| arrhythaflutter | Aflutter | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhyththird | 3rd deg AVB | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhythsecond | 2nd deg AVB | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhythsss | SSS | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
+| arrhythvv | VF/VT | None/Remote (> 30 days preop)/Recent (<= 30 days preop) |
 | medinotr | Inotropes | Yes/[Empty] |
-| medadp5days | | |
-| medadpidis | | |
-| medacei48 | ACE/ARB | |
-| medbeta | Beta blocker | |
-| medster | Steroids | |
-| medgp | | Yes/[Empty] |
-| resusc | | |
-| numdisv | | |
-| stenleftmain | | |
-| laddiststenpercent | | |
-| hdef | | |
-| vdstena | | |
-| vdstenm | | |
-| vdinsufa | | |
-| vdinsufm | | |
-| vdinsuft | | |
-| vdaoprimet | | |
-| incidenc | | |
-| status | | |
-| iabpwhen | | |
-| cathbasassistwhen | | |
-| ecmowhen | | |
+| medadp5days | ADP-i/P2Y12 | Yes/[Empty] |
+| medadpidis | Days Since ADP-i Discontinued | 0-5 |
+| medacei48 | ACE/ARB | Yes/[Empty] |
+| medbeta | Beta blocker | Yes/[Empty] |
+| medster | Steroids | Yes/[Empty] |
+| medgp | GP2B3A | Yes/[Empty] |
+| resusc | Active resuscitation | *(see STS site)* |
+| numdisv | Number of diseased vessels | None/One/Two/Three (**String**) |
+| stenleftmain | L main stenosis | Yes/No/[Empty] |
+| laddiststenpercent | % LAD stenosis| "50 - 69%" or ">=70%" or [Empty]  |
+| hdef | EF | 1.0-99.0 |
+| vdstena | AS | Yes/[Empty] |
+| vdstenm | MS | Yes/[Empty] |
+| vdinsufa | AI | Yes/[Empty] |
+| vdinsufm | MR | Yes/[Empty] |
+| vdinsuft | TR | Yes/[Empty] |
+| vdaoprimet | Valve indication | *(see STS site)*  |
+| incidenc | Incidence | *(see STS site)*  |
+| status | Status | Elective/Urgent/… *(see STS site)* |
+| iabpwhen | IABP Timing | Preop/Intraop/Postop/[Empty] |
+| cathbasassistwhen | Cath assist | Preop/Intraop/Postop/[Empty] |
+| ecmowhen | ECMO Timing |  Preop/Intraop/Postop/Non-operative/[Empty] |
 | calculatedbmi | *Internally Calculated* | Do not provide this value. 

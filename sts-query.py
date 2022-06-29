@@ -168,6 +168,9 @@ def query_sts_api(sts_query_dict):
     time.sleep(0.2)
 
     if response.status_code != requests.codes.ok:
+        # This error may be thrown if your data are invalid, and we didn't catch that
+        # in our validation below. This might happen if you specify prior cardiac procedure types,
+        # which I don't fully validate yet, and you misspelled one of them.
         raise Exception("STS API returned status code %d" % response.status_code)
 
     sts_response = response.json()
@@ -175,6 +178,10 @@ def query_sts_api(sts_query_dict):
     assert all(
         k in STS_EXPECTED_RESULTS for k in sts_response.keys()
     ), f"API returned an unexpected value in: {sts_response.keys()}"
+
+    if not all([(0.0 <= sts_val <= 1.0) for sts_val in sts_response.values()]):
+        print("NOTE: Odd numeric value returned by STS -- maybe your data are invalid.")
+        print("Please double-check the results carefully, and open a GitHub issue if this occurs.")
 
     return response.json()
 
@@ -396,8 +403,8 @@ def validate_and_return_csv_data(csv_entry):
     "pocint6": "",
     "pocint7": "",
     "pocpciwhen": "",
-    "pocpciin": "",
     """
+    assert data["pocpciin"] in ["<= 6 Hours", ">6 Hours", ""], "Invalid pocpciin"
 
     assert data["miwhen"] in [
         "<=6 Hrs",
@@ -434,6 +441,7 @@ def validate_and_return_csv_data(csv_entry):
 
     rhythm_onset = ["None", "Remote (> 30 days preop)", "Recent (<= 30 days preop)", ""]
     assert data["arrhythatrfib"] in rhythm_onset, "Invalid arrhythatrfib"
+    assert data["arrhythafib"] in ["Persistent", "Paroxysmal", ""], "Invalid arrhythafib"
     assert data["arrhythaflutter"] in rhythm_onset, "Invalid arrhythaflutter"
     assert data["arrhyththird"] in rhythm_onset, "Invalid arrhyththird"
     assert data["arrhythsecond"] in rhythm_onset, "Invalid arrhythsecond"
