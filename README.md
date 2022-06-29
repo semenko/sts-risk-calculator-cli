@@ -73,6 +73,8 @@ id,predmort,predmm,preddeep,pred14d,predstro,predvent,predrenf,predreop,pred6d
 2,0.10089,0.48756,0.0028,0.25896,0.01259,0.30205,0.21811,0.04919,0.06589
 3,0.01906,0.14991,0.00416,0.04517,0.00802,0.0852,0.02145,0.03302,0.38684
 ```
+The STS result abbreviations (e.g. predstro) are [described here](#sts-result-abbreviations).
+
 
 # Full Options
 
@@ -106,6 +108,20 @@ This can be useful when comparing mortality predictions associated with populati
 If you use this in your publication, please consider citing this work as: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli**
 
 Released under the MIT License.  Copyright 2022, [Nick Semenkovich](https://nick.semenkovich.com/) \<semenko@alum.mit.edu\> 
+
+# STS Result Abbreviations
+
+| STS Abbreviation | Value |
+| ---------------- | ----- |
+| predmort | Mortality |
+| predrenf | Renal Failure |
+| predstro | Permanent Stroke |
+| predvent | Prolonged Ventilation |
+| preddeep | Deep Surgical Infection |
+| predreop | Reoperation |
+| predmm | Morbidity or Mortality |
+| pred6d | Short Length of Stay |
+| pred14d | Long Length of Stay |
 
 # STS Parameters
 
