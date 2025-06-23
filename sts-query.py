@@ -16,13 +16,15 @@ import os
 import sys
 import time
 
-import requests
+import asyncio
+import websockets
 import tqdm
+import json
 
 # Modern python please (esp for | operator, https://peps.python.org/pep-0584/)
 assert sys.version_info >= (3, 9)
 
-STS_API_URL = "https://riskcalc.sts.org/stswebriskcalc/v1/calculate/stsall"
+WS_API_URL = "wss://acsdriskcalc.research.sts.org/websocket/"
 
 # The required API parameters
 STS_PARAMS_REQUIRED = [
@@ -148,44 +150,379 @@ STS_EXPECTED_RESULTS = [
 ]
 
 
+async def query_sts_api_async(sts_query_dict):
+    """
+    Query the STS API via websocket.
+    Input: a dict of STS query parameters.
+    Output: the STS results dict.
+    """
+    # Prepare the "init" message with empty/default values
+    init_data = {
+        "prcvint": [],
+        "Proc": [],
+        "incidenc": [],
+        "status": [],
+        "gender": [],
+        "racemulti": [],
+        "payordata": [],
+        "diabetes": [],
+        "endocarditis": [],
+        "ivdrugab": [],
+        "alcohol": [],
+        "tobaccouse": [],
+        "chrlungd": [],
+        "cvd": [],
+        "heartfailtmg": [],
+        "classnyh": [],
+        "mcs": [],
+        "cardsymptimeofadm": [],
+        "miwhen": [],
+        "numdisv": [],
+        "vdinsufa": [],
+        "vdinsufm": [],
+        "vdinsuft": [],
+        "arrhythatrfib": [],
+        "arrhythafib": [],
+        "arrhythaflutter": [],
+        "arrhythvv": [],
+        "arrhythsss": [],
+        "arrhythsecond": [],
+        "arrhyththird": [],
+        "prvalveproc": [],
+        "pocpci": [],
+        "pocint": [],
+        "tab": "Clinical Summary",
+        "decline:shiny.action": 0,
+        "reset:shiny.action": 0,
+        "copybuttonestimates:shiny.action": 0,
+        "copybuttonsummary:shiny.action": 0,
+        "vstrpr": False,
+        "medacei48": False,
+        "medgp": False,
+        "medinotr": False,
+        "medster": False,
+        "medadp5days": False,
+        "fhcad": False,
+        "hypertn": False,
+        "liverdis": False,
+        "mediastrad": False,
+        "unrespstat": False,
+        "dialysis": False,
+        "cancer": False,
+        "syncope": False,
+        "immsupp": False,
+        "pneumonia": False,
+        "slpapn": False,
+        "hmo2": False,
+        "pvd": False,
+        "cvdstenrt": False,
+        "cvdpcarsurg": False,
+        "cvdstenlft": False,
+        "carshock": False,
+        "resusc": False,
+        "stenleftmain": False,
+        "laddiststenpercent": False,
+        "vdstena": False,
+        "vdstenm": False,
+        "vdaoprimet": False,
+        "ageN:shiny.number": None,
+        "heightN:shiny.number": None,
+        "weightN:shiny.number": None,
+        "BMI:shiny.number": None,
+        "creatlstN:shiny.number": None,
+        "hctN:shiny.number": None,
+        "wbcN:shiny.number": None,
+        "plateletsN:shiny.number": None,
+        "medadpidis:shiny.number": None,
+        "hdef:shiny.number": None,
+        ".clientdata_output_errorMessage_hidden": False,
+        ".clientdata_output_text2_hidden": False,
+        ".clientdata_output_summary_hidden": False,
+        ".clientdata_pixelratio": 1,
+        ".clientdata_url_protocol": "https:",
+        ".clientdata_url_hostname": "acsdriskcalc.research.sts.org",
+        ".clientdata_url_port": "",
+        ".clientdata_url_pathname": "/",
+        ".clientdata_url_search": "",
+        ".clientdata_url_hash_initial": "",
+        ".clientdata_url_hash": "",
+        ".clientdata_singletons": "add739c82ab207ed2c80be4b7e4b181525eb7a75",
+    }
+
+    # Map procid to Proc string as expected by the websocket API
+    procid_to_proc = {
+        "1": "CABG",
+        "2": "AVR",
+        "3": "MVR",
+        "4": "AVR + CABG",
+        "5": "MVR + CABG",
+        "7": "MV Repair",
+        "8": "MV Repair + CABG",
+    }
+
+    update_data = {}
+
+    # Map procedure
+    if "procid" in sts_query_dict and sts_query_dict["procid"] in procid_to_proc:
+        update_data["Proc"] = [procid_to_proc[sts_query_dict["procid"]]]
+
+    # Map age
+    if "age" in sts_query_dict and sts_query_dict["age"]:
+        update_data["ageN"] = int(sts_query_dict["age"])
+
+    # Map height and weight
+    if "heightcm" in sts_query_dict and sts_query_dict["heightcm"]:
+        update_data["heightN"] = float(sts_query_dict["heightcm"])
+    if "weightkg" in sts_query_dict and sts_query_dict["weightkg"]:
+        update_data["weightN"] = float(sts_query_dict["weightkg"])
+
+    # BMI (optional, can be calculated)
+    if "weightkg" in sts_query_dict and "heightcm" in sts_query_dict and sts_query_dict["weightkg"] and sts_query_dict["heightcm"]:
+        bmi = float(sts_query_dict["weightkg"]) / ((float(sts_query_dict["heightcm"]) / 100.0) ** 2)
+        update_data["BMI"] = round(bmi, 2)
+
+    # Map gender
+    if "gender" in sts_query_dict and sts_query_dict["gender"]:
+        update_data["gender"] = [sts_query_dict["gender"]]
+
+    # Map status
+    if "status" in sts_query_dict and sts_query_dict["status"]:
+        update_data["status"] = [sts_query_dict["status"]]
+
+    # Map incidence
+    if "incidenc" in sts_query_dict and sts_query_dict["incidenc"]:
+        update_data["incidenc"] = [sts_query_dict["incidenc"]]
+
+    # Map lab values
+    if "creatlst" in sts_query_dict and sts_query_dict["creatlst"]:
+        update_data["creatlstN"] = float(sts_query_dict["creatlst"])
+    if "hct" in sts_query_dict and sts_query_dict["hct"]:
+        update_data["hctN"] = int(sts_query_dict["hct"])
+    if "wbc" in sts_query_dict and sts_query_dict["wbc"]:
+        update_data["wbcN"] = float(sts_query_dict["wbc"])
+    if "platelets" in sts_query_dict and sts_query_dict["platelets"]:
+        update_data["plateletsN"] = int(sts_query_dict["platelets"])
+    if "hdef" in sts_query_dict and sts_query_dict["hdef"]:
+        update_data["hdef"] = float(sts_query_dict["hdef"])
+
+    # Map medication discontinuation days
+    if "medadpidis" in sts_query_dict and sts_query_dict["medadpidis"]:
+        update_data["medadpidis"] = int(sts_query_dict["medadpidis"])
+
+    # Map boolean fields
+    boolean_fields = [
+        "medacei48", "medgp", "medinotr", "medster", "medadp5days", "fhcad",
+        "hypertn", "liverdis", "mediastrad", "unrespstat", "dialysis", "cancer",
+        "syncope", "immsupp", "pneumonia", "slpapn", "hmo2", "pvd", "cvdstenrt",
+        "cvdpcarsurg", "cvdstenlft", "carshock", "resusc", "stenleftmain",
+        "laddiststenpercent", "vdstena", "vdstenm", "vdaoprimet"
+    ]
+    for field in boolean_fields:
+        if field in sts_query_dict and sts_query_dict[field] == "Yes":
+            update_data[field] = True
+
+    # Map array fields that need special handling
+    array_field_mappings = {
+        "diabetes": "diabetes",
+        "ivdrugab": "ivdrugab", 
+        "alcohol": "alcohol",
+        "tobaccouse": "tobaccouse",
+        "chrlungd": "chrlungd",
+        "cvd": "cvd",
+        "heartfailtmg": "heartfailtmg",
+        "classnyh": "classnyh",
+        "cardsymptimeofadm": "cardsymptimeofadm",
+        "miwhen": "miwhen",
+        "numdisv": "numdisv",
+        "vdinsufa": "vdinsufa",
+        "vdinsufm": "vdinsufm",
+        "vdinsuft": "vdinsuft",
+        "arrhythatrfib": "arrhythatrfib",
+        "arrhythafib": "arrhythafib",
+        "arrhythaflutter": "arrhythaflutter",
+        "arrhythvv": "arrhythvv",
+        "arrhythsss": "arrhythsss",
+        "arrhythsecond": "arrhythsecond",
+        "arrhyththird": "arrhyththird"
+    }
+    
+    for sts_field, ws_field in array_field_mappings.items():
+        if sts_field in sts_query_dict and sts_query_dict[sts_field]:
+            update_data[ws_field] = [sts_query_dict[sts_field]]
+
+    # Map previous procedures
+    if "prcvint" in sts_query_dict and sts_query_dict["prcvint"] == "Yes":
+        update_data["prcvint"] = ["Yes"]
+    if "pocpci" in sts_query_dict and sts_query_dict["pocpci"] == "Yes":
+        update_data["pocpci"] = ["Yes"]
+
+    # Map valve procedures
+    valve_procs = []
+    for i in range(1, 6):
+        field = f"prvalveproc{i}"
+        if field in sts_query_dict and sts_query_dict[field]:
+            valve_procs.append(sts_query_dict[field])
+    if valve_procs:
+        update_data["prvalveproc"] = valve_procs
+
+    # Map other cardiac interventions
+    poc_ints = []
+    for i in range(1, 8):
+        field = f"pocint{i}"
+        if field in sts_query_dict and sts_query_dict[field]:
+            poc_ints.append(sts_query_dict[field])
+    if poc_ints:
+        update_data["pocint"] = poc_ints
+
+    # Map race/ethnicity (these go into racemulti array)
+    race_fields = []
+    if sts_query_dict.get("raceasian") == "Yes":
+        race_fields.append("Asian")
+    if sts_query_dict.get("raceblack") == "Yes":
+        race_fields.append("Black or African American")
+    if sts_query_dict.get("racenativeam") == "Yes":
+        race_fields.append("American Indian or Alaska Native")
+    if sts_query_dict.get("racnativepacific") == "Yes":
+        race_fields.append("Native Hawaiian or Other Pacific Islander")
+    if sts_query_dict.get("ethnicity") == "Yes":
+        race_fields.append("Hispanic or Latino")
+    if race_fields:
+        update_data["racemulti"] = race_fields
+
+    # Map payor data
+    payors = []
+    if sts_query_dict.get("payorprim"):
+        payors.append(sts_query_dict["payorprim"])
+    if sts_query_dict.get("payorsecond"):
+        payors.append(sts_query_dict["payorsecond"])
+    if payors:
+        update_data["payordata"] = payors
+
+    # Map endocarditis
+    if sts_query_dict.get("infendo") == "Yes" and sts_query_dict.get("infendty"):
+        update_data["endocarditis"] = [sts_query_dict["infendty"]]
+
+    # Map diabetes control
+    if sts_query_dict.get("diabetes") == "Yes" and sts_query_dict.get("diabctrl"):
+        update_data["diabetes"] = [sts_query_dict["diabctrl"]]
+
+    # Open websocket and send messages
+    ws_headers = [
+        ("Origin", "https://acsdriskcalc.research.sts.org"),
+        ("Referer", "https://acsdriskcalc.research.sts.org/"),
+        ("User-Agent", "Mozilla/5.0"),
+    ]
+
+    # Prepare JSON messages
+    init_msg = '{"method":"init","data":' + json.dumps(init_data) + '}'
+    update_msg = '{"method":"update","data":' + json.dumps(update_data) + '}'
+
+    # Print curl commands to replicate the websocket requests
+    print("\nTo replicate the websocket requests with wscat or curl, use:")
+    print("wscat example:")
+    print(
+        "wscat -c wss://acsdriskcalc.research.sts.org/websocket/ "
+        + " ".join(
+            f'-H "{k}: {v}"' for k, v in ws_headers
+        )
+    )
+    print("\ninit message:")
+    print(init_msg)
+    print("\nupdate message:")
+    print(update_msg)
+    print("\nCurl (WebSocket) example (using websocat):")
+    print(
+        "websocat "
+        + " ".join(f'-H "{k}: {v}"' for k, v in ws_headers)
+        + ' wss://acsdriskcalc.research.sts.org/websocket/'
+    )
+    print("# Then send the following messages in sequence:")
+    print(init_msg)
+    print(update_msg)
+    print()
+
+    async with websockets.connect(
+        WS_API_URL,
+        additional_headers=ws_headers
+    ) as ws:
+        await ws.send(init_msg)
+        # Sleep for 1 second
+        await asyncio.sleep(1)  # Give the server time to process init
+        await ws.send(update_msg)
+        # Wait for response(s)
+        result = None
+        for _ in range(30):  # Try up to 20 messages
+            msg = await ws.recv()
+            try:
+                msg_data = json.loads(msg)
+                print("***")
+                print(msg_data)
+                # Look for the response with errors and values.text2.html structure
+                if (msg_data.get("errors") is not None and 
+                    msg_data.get("values", {}).get("text2", {}).get("html")):
+                    # Parse the HTML content to extract risk values
+                    html_content = msg_data["values"]["text2"]["html"]
+                    result = parse_sts_html_response(html_content)
+                    if result and any(k in result for k in STS_EXPECTED_RESULTS):
+                        break
+            except Exception:
+                continue
+        if result is None:
+            raise Exception("No valid response from STS websocket API")
+        return result
+
+def parse_sts_html_response(html_content):
+    """
+    Parse the HTML response from STS API to extract risk values.
+    The HTML contains the risk predictions that we need to extract.
+    """
+    import re
+    
+    result = {}
+    
+    # Define patterns to extract each risk value from HTML
+    risk_patterns = {
+        "predmort": r"Operative Mortality.*?(\d+\.?\d*)%",
+        "predmm": r"Major Morbidity.*?(\d+\.?\d*)%", 
+        "preddeep": r"Deep Sternal Wound Infection.*?(\d+\.?\d*)%",
+        "pred14d": r"Renal Failure.*?(\d+\.?\d*)%",
+        "predstro": r"Stroke.*?(\d+\.?\d*)%",
+        "predvent": r"Prolonged Ventilation.*?(\d+\.?\d*)%",
+        "predrenf": r"Renal Failure.*?(\d+\.?\d*)%",
+        "predreop": r"Re-operation.*?(\d+\.?\d*)%",
+        "pred6d": r"Short Length of Stay.*?(\d+\.?\d*)%"
+    }
+    
+    # Try to extract values using regex patterns
+    for key, pattern in risk_patterns.items():
+        match = re.search(pattern, html_content, re.IGNORECASE | re.DOTALL)
+        if match:
+            try:
+                # Convert percentage to decimal
+                result[key] = float(match.group(1)) / 100.0
+            except ValueError:
+                continue
+    
+    # If regex fails, try a more general approach looking for percentage values
+    if not result:
+        # Look for any percentage values in the HTML
+        percentage_matches = re.findall(r'(\d+\.?\d*)%', html_content)
+        if len(percentage_matches) >= len(STS_EXPECTED_RESULTS):
+            # Map the found percentages to expected results in order
+            for i, key in enumerate(STS_EXPECTED_RESULTS):
+                if i < len(percentage_matches):
+                    try:
+                        result[key] = float(percentage_matches[i]) / 100.0
+                    except ValueError:
+                        continue
+    
+    return result
+
 def query_sts_api(sts_query_dict):
     """
-    Encode a dict as .json and pass it to the STS API with a small delay.
-
-    Input: a dict of STS query parameters:
-    Outout: the STS results dict
+    Synchronous wrapper for async websocket API call.
     """
-    # The STS client side computes BMI (why?)
-    sts_query_dict["calculatedbmi"] = round(
-        (
-            float(sts_query_dict["weightkg"])
-            / ((float(sts_query_dict["heightcm"]) / 100.0) ** 2)
-        ),
-        2,
-    )
-
-    response = requests.post(url=STS_API_URL, json=sts_query_dict)
-    time.sleep(0.2)
-
-    if response.status_code != requests.codes.ok:
-        # This error may be thrown if your data are invalid, and we didn't catch that
-        # in our validation below. This might happen if you specify prior cardiac procedure types,
-        # which I don't fully validate yet, and you misspelled one of them.
-        raise Exception("STS API returned status code %d" % response.status_code)
-
-    sts_response = response.json()
-
-    assert all(
-        k in STS_EXPECTED_RESULTS for k in sts_response.keys()
-    ), f"API returned an unexpected value in: {sts_response.keys()}"
-
-    # NOTE: Some values can be empty -- e.g. predrenf (at least) is sometimes blank
-    # I choose to only validate overall mortality, which seems to always result.
-    if not (0.0 <= sts_response["predmort"] <= 1.0):
-        print("NOTE: Odd numeric value returned by STS -- maybe your data are invalid.")
-        print("Please double-check the results carefully, and open a GitHub issue if this occurs.")
-
-    return response.json()
+    return asyncio.run(query_sts_api_async(sts_query_dict))
 
 
 def validate_and_return_csv_data(csv_entry):
@@ -693,9 +1030,7 @@ def main():
         # Query the API for all CSV entries
         for entry in tqdm.tqdm(validated_patient_data):
             patient_id = entry["id"]
-            # Don't send the ID to STS
             del entry["id"]
-
             assert patient_id not in sts_results, "Your patient IDs were not unique!"
             sts_results[patient_id] = query_sts_api(entry)
 
