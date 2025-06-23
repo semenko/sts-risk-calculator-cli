@@ -149,15 +149,60 @@ STS_EXPECTED_RESULTS = [
     "pred6d",
 ]
 
+# Field mapping configurations
+PROCID_TO_PROC = {
+    "1": "CABG",
+    "2": "AVR", 
+    "3": "MVR",
+    "4": "AVR + CABG",
+    "5": "MVR + CABG",
+    "7": "MV Repair",
+    "8": "MV Repair + CABG",
+}
 
-async def query_sts_api_async(sts_query_dict):
-    """
-    Query the STS API via websocket.
-    Input: a dict of STS query parameters.
-    Output: the STS results dict.
-    """
-    # Prepare the "init" message with empty/default values
-    init_data = {
+BOOLEAN_FIELDS = [
+    "medacei48", "medgp", "medinotr", "medster", "medadp5days", "fhcad",
+    "hypertn", "liverdis", "mediastrad", "unrespstat", "dialysis", "cancer",
+    "syncope", "immsupp", "pneumonia", "slpapn", "hmo2", "pvd", "cvdstenrt",
+    "cvdpcarsurg", "cvdstenlft", "carshock", "resusc", "stenleftmain",
+    "laddiststenpercent", "vdstena", "vdstenm", "vdaoprimet"
+]
+
+ARRAY_FIELD_MAPPINGS = {
+    "diabetes": "diabetes",
+    "ivdrugab": "ivdrugab", 
+    "alcohol": "alcohol",
+    "tobaccouse": "tobaccouse",
+    "chrlungd": "chrlungd",
+    "cvd": "cvd",
+    "heartfailtmg": "heartfailtmg",
+    "classnyh": "classnyh",
+    "cardsymptimeofadm": "cardsymptimeofadm",
+    "miwhen": "miwhen",
+    "numdisv": "numdisv",
+    "vdinsufa": "vdinsufa",
+    "vdinsufm": "vdinsufm",
+    "vdinsuft": "vdinsuft",
+    "arrhythatrfib": "arrhythatrfib",
+    "arrhythafib": "arrhythafib",
+    "arrhythaflutter": "arrhythaflutter",
+    "arrhythvv": "arrhythvv",
+    "arrhythsss": "arrhythsss",
+    "arrhythsecond": "arrhythsecond",
+    "arrhyththird": "arrhyththird"
+}
+
+RACE_MAPPINGS = {
+    "raceasian": "Asian",
+    "raceblack": "Black or African American", 
+    "racenativeam": "American Indian or Alaska Native",
+    "racnativepacific": "Native Hawaiian or Other Pacific Islander",
+    "ethnicity": "Hispanic or Latino"
+}
+
+def create_websocket_init_data():
+    """Create the initial websocket data structure."""
+    return {
         "prcvint": [],
         "Proc": [],
         "incidenc": [],
@@ -197,34 +242,7 @@ async def query_sts_api_async(sts_query_dict):
         "copybuttonestimates:shiny.action": 0,
         "copybuttonsummary:shiny.action": 0,
         "vstrpr": False,
-        "medacei48": False,
-        "medgp": False,
-        "medinotr": False,
-        "medster": False,
-        "medadp5days": False,
-        "fhcad": False,
-        "hypertn": False,
-        "liverdis": False,
-        "mediastrad": False,
-        "unrespstat": False,
-        "dialysis": False,
-        "cancer": False,
-        "syncope": False,
-        "immsupp": False,
-        "pneumonia": False,
-        "slpapn": False,
-        "hmo2": False,
-        "pvd": False,
-        "cvdstenrt": False,
-        "cvdpcarsurg": False,
-        "cvdstenlft": False,
-        "carshock": False,
-        "resusc": False,
-        "stenleftmain": False,
-        "laddiststenpercent": False,
-        "vdstena": False,
-        "vdstenm": False,
-        "vdaoprimet": False,
+        **{field: False for field in BOOLEAN_FIELDS},
         "ageN:shiny.number": None,
         "heightN:shiny.number": None,
         "weightN:shiny.number": None,
@@ -249,214 +267,171 @@ async def query_sts_api_async(sts_query_dict):
         ".clientdata_singletons": "add739c82ab207ed2c80be4b7e4b181525eb7a75",
     }
 
-    # Map procid to Proc string as expected by the websocket API
-    procid_to_proc = {
-        "1": "CABG",
-        "2": "AVR",
-        "3": "MVR",
-        "4": "AVR + CABG",
-        "5": "MVR + CABG",
-        "7": "MV Repair",
-        "8": "MV Repair + CABG",
-    }
-
-    update_data = {}
-
-    # Map procedure
-    if "procid" in sts_query_dict and sts_query_dict["procid"] in procid_to_proc:
-        update_data["Proc"] = [procid_to_proc[sts_query_dict["procid"]]]
-
-    # Map age
+def map_basic_fields(sts_query_dict, update_data):
+    """Map basic scalar fields."""
+    # Procedure
+    if "procid" in sts_query_dict and sts_query_dict["procid"] in PROCID_TO_PROC:
+        update_data["Proc"] = [PROCID_TO_PROC[sts_query_dict["procid"]]]
+    
+    # Demographics
     if "age" in sts_query_dict and sts_query_dict["age"]:
         update_data["ageN"] = int(sts_query_dict["age"])
+    if "gender" in sts_query_dict and sts_query_dict["gender"]:
+        update_data["gender"] = [sts_query_dict["gender"]]
+    if "status" in sts_query_dict and sts_query_dict["status"]:
+        update_data["status"] = [sts_query_dict["status"]]
+    if "incidenc" in sts_query_dict and sts_query_dict["incidenc"]:
+        update_data["incidenc"] = [sts_query_dict["incidenc"]]
 
-    # Map height and weight
+def map_biometric_fields(sts_query_dict, update_data):
+    """Map height, weight, and BMI fields."""
     if "heightcm" in sts_query_dict and sts_query_dict["heightcm"]:
         update_data["heightN"] = float(sts_query_dict["heightcm"])
     if "weightkg" in sts_query_dict and sts_query_dict["weightkg"]:
         update_data["weightN"] = float(sts_query_dict["weightkg"])
-
-    # BMI (optional, can be calculated)
-    if "weightkg" in sts_query_dict and "heightcm" in sts_query_dict and sts_query_dict["weightkg"] and sts_query_dict["heightcm"]:
+    
+    # Calculate BMI if both height and weight are available
+    if ("weightkg" in sts_query_dict and "heightcm" in sts_query_dict and 
+        sts_query_dict["weightkg"] and sts_query_dict["heightcm"]):
         bmi = float(sts_query_dict["weightkg"]) / ((float(sts_query_dict["heightcm"]) / 100.0) ** 2)
         update_data["BMI"] = round(bmi, 2)
 
-    # Map gender
-    if "gender" in sts_query_dict and sts_query_dict["gender"]:
-        update_data["gender"] = [sts_query_dict["gender"]]
+def map_lab_fields(sts_query_dict, update_data):
+    """Map laboratory values."""
+    lab_mappings = {
+        "creatlst": ("creatlstN", float),
+        "hct": ("hctN", int),
+        "wbc": ("wbcN", float),
+        "platelets": ("plateletsN", int),
+        "hdef": ("hdef", float),
+        "medadpidis": ("medadpidis", int)
+    }
+    
+    for sts_field, (ws_field, converter) in lab_mappings.items():
+        if sts_field in sts_query_dict and sts_query_dict[sts_field]:
+            update_data[ws_field] = converter(sts_query_dict[sts_field])
 
-    # Map status
-    if "status" in sts_query_dict and sts_query_dict["status"]:
-        update_data["status"] = [sts_query_dict["status"]]
-
-    # Map incidence
-    if "incidenc" in sts_query_dict and sts_query_dict["incidenc"]:
-        update_data["incidenc"] = [sts_query_dict["incidenc"]]
-
-    # Map lab values
-    if "creatlst" in sts_query_dict and sts_query_dict["creatlst"]:
-        update_data["creatlstN"] = float(sts_query_dict["creatlst"])
-    if "hct" in sts_query_dict and sts_query_dict["hct"]:
-        update_data["hctN"] = int(sts_query_dict["hct"])
-    if "wbc" in sts_query_dict and sts_query_dict["wbc"]:
-        update_data["wbcN"] = float(sts_query_dict["wbc"])
-    if "platelets" in sts_query_dict and sts_query_dict["platelets"]:
-        update_data["plateletsN"] = int(sts_query_dict["platelets"])
-    if "hdef" in sts_query_dict and sts_query_dict["hdef"]:
-        update_data["hdef"] = float(sts_query_dict["hdef"])
-
-    # Map medication discontinuation days
-    if "medadpidis" in sts_query_dict and sts_query_dict["medadpidis"]:
-        update_data["medadpidis"] = int(sts_query_dict["medadpidis"])
-
-    # Map boolean fields
-    boolean_fields = [
-        "medacei48", "medgp", "medinotr", "medster", "medadp5days", "fhcad",
-        "hypertn", "liverdis", "mediastrad", "unrespstat", "dialysis", "cancer",
-        "syncope", "immsupp", "pneumonia", "slpapn", "hmo2", "pvd", "cvdstenrt",
-        "cvdpcarsurg", "cvdstenlft", "carshock", "resusc", "stenleftmain",
-        "laddiststenpercent", "vdstena", "vdstenm", "vdaoprimet"
-    ]
-    for field in boolean_fields:
+def map_boolean_fields(sts_query_dict, update_data):
+    """Map boolean fields."""
+    for field in BOOLEAN_FIELDS:
         if field in sts_query_dict and sts_query_dict[field] == "Yes":
             update_data[field] = True
 
-    # Map array fields that need special handling
-    array_field_mappings = {
-        "diabetes": "diabetes",
-        "ivdrugab": "ivdrugab", 
-        "alcohol": "alcohol",
-        "tobaccouse": "tobaccouse",
-        "chrlungd": "chrlungd",
-        "cvd": "cvd",
-        "heartfailtmg": "heartfailtmg",
-        "classnyh": "classnyh",
-        "cardsymptimeofadm": "cardsymptimeofadm",
-        "miwhen": "miwhen",
-        "numdisv": "numdisv",
-        "vdinsufa": "vdinsufa",
-        "vdinsufm": "vdinsufm",
-        "vdinsuft": "vdinsuft",
-        "arrhythatrfib": "arrhythatrfib",
-        "arrhythafib": "arrhythafib",
-        "arrhythaflutter": "arrhythaflutter",
-        "arrhythvv": "arrhythvv",
-        "arrhythsss": "arrhythsss",
-        "arrhythsecond": "arrhythsecond",
-        "arrhyththird": "arrhyththird"
-    }
-    
-    for sts_field, ws_field in array_field_mappings.items():
+def map_array_fields(sts_query_dict, update_data):
+    """Map fields that should be arrays."""
+    for sts_field, ws_field in ARRAY_FIELD_MAPPINGS.items():
         if sts_field in sts_query_dict and sts_query_dict[sts_field]:
             update_data[ws_field] = [sts_query_dict[sts_field]]
 
-    # Map previous procedures
+def map_procedure_fields(sts_query_dict, update_data):
+    """Map previous procedure fields."""
+    # Previous cardiovascular intervention
     if "prcvint" in sts_query_dict and sts_query_dict["prcvint"] == "Yes":
         update_data["prcvint"] = ["Yes"]
     if "pocpci" in sts_query_dict and sts_query_dict["pocpci"] == "Yes":
         update_data["pocpci"] = ["Yes"]
-
-    # Map valve procedures
-    valve_procs = []
-    for i in range(1, 6):
-        field = f"prvalveproc{i}"
-        if field in sts_query_dict and sts_query_dict[field]:
-            valve_procs.append(sts_query_dict[field])
+    
+    # Valve procedures
+    valve_procs = [sts_query_dict[f"prvalveproc{i}"] 
+                   for i in range(1, 6) 
+                   if f"prvalveproc{i}" in sts_query_dict and sts_query_dict[f"prvalveproc{i}"]]
     if valve_procs:
         update_data["prvalveproc"] = valve_procs
-
-    # Map other cardiac interventions
-    poc_ints = []
-    for i in range(1, 8):
-        field = f"pocint{i}"
-        if field in sts_query_dict and sts_query_dict[field]:
-            poc_ints.append(sts_query_dict[field])
+    
+    # Other cardiac interventions
+    poc_ints = [sts_query_dict[f"pocint{i}"] 
+                for i in range(1, 8) 
+                if f"pocint{i}" in sts_query_dict and sts_query_dict[f"pocint{i}"]]
     if poc_ints:
         update_data["pocint"] = poc_ints
 
-    # Map race/ethnicity (these go into racemulti array)
-    race_fields = []
-    if sts_query_dict.get("raceasian") == "Yes":
-        race_fields.append("Asian")
-    if sts_query_dict.get("raceblack") == "Yes":
-        race_fields.append("Black or African American")
-    if sts_query_dict.get("racenativeam") == "Yes":
-        race_fields.append("American Indian or Alaska Native")
-    if sts_query_dict.get("racnativepacific") == "Yes":
-        race_fields.append("Native Hawaiian or Other Pacific Islander")
-    if sts_query_dict.get("ethnicity") == "Yes":
-        race_fields.append("Hispanic or Latino")
+def map_race_ethnicity_fields(sts_query_dict, update_data):
+    """Map race and ethnicity fields."""
+    race_fields = [race_name 
+                   for sts_field, race_name in RACE_MAPPINGS.items() 
+                   if sts_query_dict.get(sts_field) == "Yes"]
     if race_fields:
         update_data["racemulti"] = race_fields
 
-    # Map payor data
-    payors = []
-    if sts_query_dict.get("payorprim"):
-        payors.append(sts_query_dict["payorprim"])
-    if sts_query_dict.get("payorsecond"):
-        payors.append(sts_query_dict["payorsecond"])
+def map_payor_fields(sts_query_dict, update_data):
+    """Map payor fields."""
+    payors = [payor for payor in [sts_query_dict.get("payorprim"), sts_query_dict.get("payorsecond")] 
+              if payor]
     if payors:
         update_data["payordata"] = payors
 
-    # Map endocarditis
+def map_special_condition_fields(sts_query_dict, update_data):
+    """Map special condition fields that require multiple field checks."""
+    # Endocarditis
     if sts_query_dict.get("infendo") == "Yes" and sts_query_dict.get("infendty"):
         update_data["endocarditis"] = [sts_query_dict["infendty"]]
-
-    # Map diabetes control
+    
+    # Diabetes control
     if sts_query_dict.get("diabetes") == "Yes" and sts_query_dict.get("diabctrl"):
         update_data["diabetes"] = [sts_query_dict["diabctrl"]]
 
-    # Open websocket and send messages
+def prepare_websocket_messages(sts_query_dict):
+    """Prepare init and update messages for websocket communication."""
+    init_data = create_websocket_init_data()
+    update_data = {}
+    
+    # Apply all field mappings
+    map_basic_fields(sts_query_dict, update_data)
+    map_biometric_fields(sts_query_dict, update_data)
+    map_lab_fields(sts_query_dict, update_data)
+    map_boolean_fields(sts_query_dict, update_data)
+    map_array_fields(sts_query_dict, update_data)
+    map_procedure_fields(sts_query_dict, update_data)
+    map_race_ethnicity_fields(sts_query_dict, update_data)
+    map_payor_fields(sts_query_dict, update_data)
+    map_special_condition_fields(sts_query_dict, update_data)
+    
+    return (
+        '{"method":"init","data":' + json.dumps(init_data) + '}',
+        '{"method":"update","data":' + json.dumps(update_data) + '}'
+    )
+
+def print_debug_info(init_msg, update_msg):
+    """Print debugging information for websocket requests."""
+    ws_headers = [
+        ("Origin", "https://acsdriskcalc.research.sts.org"),
+        ("Referer", "https://acsdriskcalc.research.sts.org/"),
+        ("User-Agent", "Mozilla/5.0"),
+    ]
+    
+    print("\nTo replicate the websocket requests with wscat or curl, use:")
+    print("wscat example:")
+    print("wscat -c wss://acsdriskcalc.research.sts.org/websocket/ " + 
+          " ".join(f'-H "{k}: {v}"' for k, v in ws_headers))
+    print(init_msg)
+    print(update_msg)
+    print()
+
+async def query_sts_api_async(sts_query_dict):
+    """
+    Query the STS API via websocket.
+    Input: a dict of STS query parameters.
+    Output: the STS results dict.
+    """
+    init_msg, update_msg = prepare_websocket_messages(sts_query_dict)
+    print_debug_info(init_msg, update_msg)
+    
     ws_headers = [
         ("Origin", "https://acsdriskcalc.research.sts.org"),
         ("Referer", "https://acsdriskcalc.research.sts.org/"),
         ("User-Agent", "Mozilla/5.0"),
     ]
 
-    # Prepare JSON messages
-    init_msg = '{"method":"init","data":' + json.dumps(init_data) + '}'
-    update_msg = '{"method":"update","data":' + json.dumps(update_data) + '}'
-
-    # Print curl commands to replicate the websocket requests
-    print("\nTo replicate the websocket requests with wscat or curl, use:")
-    print("wscat example:")
-    print(
-        "wscat -c wss://acsdriskcalc.research.sts.org/websocket/ "
-        + " ".join(
-            f'-H "{k}: {v}"' for k, v in ws_headers
-        )
-    )
-    print("\ninit message:")
-    print(init_msg)
-    print("\nupdate message:")
-    print(update_msg)
-    print("\nCurl (WebSocket) example (using websocat):")
-    print(
-        "websocat "
-        + " ".join(f'-H "{k}: {v}"' for k, v in ws_headers)
-        + ' wss://acsdriskcalc.research.sts.org/websocket/'
-    )
-    print("# Then send the following messages in sequence:")
-    print(init_msg)
-    print(update_msg)
-    print()
-
-    async with websockets.connect(
-        WS_API_URL,
-        additional_headers=ws_headers
-    ) as ws:
+    async with websockets.connect(WS_API_URL, additional_headers=ws_headers) as ws:
         await ws.send(init_msg)
-        # Sleep for 1 second
         await asyncio.sleep(1)  # Give the server time to process init
         await ws.send(update_msg)
+        
         # Wait for response(s)
-        result = None
-        for _ in range(30):  # Try up to 20 messages
+        for _ in range(30):  # Try up to 30 messages
             msg = await ws.recv()
             try:
                 msg_data = json.loads(msg)
-                print("***")
-                print(msg_data)
                 # Look for the response with errors and values.text2.html structure
                 if (msg_data.get("errors") is not None and 
                     msg_data.get("values", {}).get("text2", {}).get("html")):
@@ -464,12 +439,11 @@ async def query_sts_api_async(sts_query_dict):
                     html_content = msg_data["values"]["text2"]["html"]
                     result = parse_sts_html_response(html_content)
                     if result and any(k in result for k in STS_EXPECTED_RESULTS):
-                        break
+                        return result
             except Exception:
                 continue
-        if result is None:
-            raise Exception("No valid response from STS websocket API")
-        return result
+        
+        raise Exception("No valid response from STS websocket API")
 
 def parse_sts_html_response(html_content):
     """
