@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sts-risk-calculator"
+version = "0.1.0"
+description = "Bulk query the STS Short-Term Risk Calculator via CSV patient data"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Nick Semenkovich", email = "semenko@alum.mit.edu" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Healthcare Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "websockets",
+    "tqdm",
+]
+
+[project.scripts]
+sts-query = "sts_query:main"
+
+[project.urls]
+Homepage = "https://github.com/semenko/sts-risk-calculator-cli"
+Repository = "https://github.com/semenko/sts-risk-calculator-cli"
+Issues = "https://github.com/semenko/sts-risk-calculator-cli/issues"
+
+[tool.setuptools]
+py-modules = ["sts_query"]

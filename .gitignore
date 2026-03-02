@@ -2,3 +2,9 @@
 *.csv
 !sample_data.csv
 !sample_results.csv
+
+# Python packaging
+dist/
+build/
+*.egg-info/
+__pycache__/

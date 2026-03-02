@@ -13,6 +13,11 @@ Repeatedly query the Society of Thoracic Surgeons Adult Cardiac Risk Calculator 
 
 </div>
 
+# Installation
+
+```
+pip install sts-risk-calculator
+```
 
 # Overview
 This is a minimalist Python command line tool to query the STS risk calculator with bulk patient records. This returns all available mortality and complication data from the STS. There is no upper limit to your query size -- this has been successfully run on datasets of ~500+ patients. 
@@ -36,12 +41,17 @@ You must provide a CSV with a unique **id** per row, followed by a minimum of **
 
 The most critical step is formatting your data to **exactly** match the STS risk parameter names & values ([detailed here](#sts-parameters)). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
 
-### 0. Setup this script
-For example, on Mac, open the Terminal app and enter:
+### 0. Setup
+Install via pip:
+```
+pip install sts-risk-calculator
+```
+
+Or install from source:
 ```
 git clone https://github.com/semenko/sts-risk-calculator-cli
 cd sts-risk-calculator-cli
-pip install -r requirements.txt
+pip install .
 ```
 
 ### 1. Define input patient .csv (e.g. sample_data.csv)
@@ -55,7 +65,7 @@ id,procid,age,gender,surgdt,weightkg,heightcm,creatlst,payorprim
 ### 2. Run sts-query
 
 ```
-$ ./sts-query.py --csv sample_data.csv --output sample_results.csv
+$ sts-query --csv sample_data.csv --output sample_results.csv
 Validating CSV entries...
 Valid!
 
@@ -83,8 +93,8 @@ The STS result abbreviations (e.g. predstro) are [described here](#sts-result-ab
 # Full Options
 
 ```
-$ ./sts-query.py
-usage: sts-query.py [options]
+$ sts-query
+usage: sts-query [options]
 
 Query the STS Short-Term Risk Calculator via a CSV.
 Please cite this repository if you're using in a publication.
