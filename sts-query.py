@@ -151,9 +151,9 @@ STS_EXPECTED_RESULTS = [
 
 # Field mapping configurations
 PROCID_TO_PROC = {
-    "1": "CABG",
-    "2": "AVR", 
-    "3": "MVR",
+    "1": "Isolated CABG",
+    "2": "Isolated AVR",
+    "3": "Isolated MVR",
     "4": "AVR + CABG",
     "5": "MVR + CABG",
     "7": "MV Repair",
@@ -170,11 +170,12 @@ BOOLEAN_FIELDS = [
 
 ARRAY_FIELD_MAPPINGS = {
     "diabetes": "diabetes",
-    "ivdrugab": "ivdrugab", 
+    "endocarditis": "endocarditis",
+    "ivdrugab": "ivdrugab",
     "alcohol": "alcohol",
     "tobaccouse": "tobaccouse",
     "chrlungd": "chrlungd",
-    "cvd": "cvd",
+    # "cvd" handled separately (merged from multiple fields)
     "heartfailtmg": "heartfailtmg",
     "classnyh": "classnyh",
     "cardsymptimeofadm": "cardsymptimeofadm",
@@ -189,16 +190,162 @@ ARRAY_FIELD_MAPPINGS = {
     "arrhythvv": "arrhythvv",
     "arrhythsss": "arrhythsss",
     "arrhythsecond": "arrhythsecond",
-    "arrhyththird": "arrhyththird"
+    "arrhyththird": "arrhyththird",
 }
 
 RACE_MAPPINGS = {
     "raceasian": "Asian",
-    "raceblack": "Black or African American", 
-    "racenativeam": "American Indian or Alaska Native",
-    "racnativepacific": "Native Hawaiian or Other Pacific Islander",
-    "ethnicity": "Hispanic or Latino"
+    "raceblack": "Black/African American",
+    "racenativeam": "Am Indian/Alaskan",
+    "racnativepacific": "Hawaiian/Pacific Islander",
+    "ethnicity": "Hispanic",
 }
+
+def translate_csv_to_shiny(data):
+    """Translate old CSV option values to new Shiny option values.
+
+    Keeps the user-facing CSV format backward-compatible by converting
+    old REST API values to the values expected by the Shiny WebSocket app.
+    """
+    data = data.copy()
+
+    # --- Simple value translations ---
+
+    # Payors
+    payor_map = {
+        "Commercial Health Insurance": "Commercial",
+        "Medicare (includes commercially managed options)": "Medicare (any type)",
+        "Medicaid (includes commercially managed options)": "Medicaid (any type)",
+        "Health Maintenance Organization": "HMO",
+    }
+    for field in ("payorprim", "payorsecond"):
+        if data.get(field) in payor_map:
+            data[field] = payor_map[data[field]]
+
+    # Tobacco
+    tobacco_current = {
+        "Current every day smoker",
+        "Current some day smoker",
+        "Smoker, current status (frequency) unknown",
+    }
+    if data.get("tobaccouse") in tobacco_current:
+        data["tobaccouse"] = "Current smoker"
+
+    # Alcohol
+    alcohol_map = {
+        "<= 1 drink/week": "\u2264 1 drink/week",
+        ">= 8 drinks/week": "\u2265 8 drinks/week",
+    }
+    if data.get("alcohol") in alcohol_map:
+        data["alcohol"] = alcohol_map[data["alcohol"]]
+
+    # MI timing
+    miwhen_map = {
+        "<=6 Hrs": "\u2264 6 Hrs",
+        ">21 Days": "> 21 Days",
+    }
+    if data.get("miwhen") in miwhen_map:
+        data["miwhen"] = miwhen_map[data["miwhen"]]
+
+    # Heart failure timing
+    hf_map = {
+        "Acute": "Yes - Acute",
+        "Chronic": "Yes - Chronic",
+        "Both": "Yes - Both",
+    }
+    if data.get("heartfailtmg") in hf_map:
+        data["heartfailtmg"] = hf_map[data["heartfailtmg"]]
+
+    # Chronic lung disease
+    if data.get("chrlungd") == "Lung disease documented, severity unknown":
+        data["chrlungd"] = "Severity Unknown"
+
+    # Incidence
+    incidenc_map = {
+        "First cardiovascular surgery": "First CV surgery",
+        "First re-op cardiovascular surgery": "ReOp#1 CV surgery",
+        "Second re-op cardiovascular surgery": "ReOp#2 CV surgery",
+        "Third re-op cardiovascular surgery": "ReOp#3 CV surgery",
+        "Fourth or more re-op cardiovascular surgery": "ReOp#4+ CV surgery",
+        "NA - Not a cardiovascular surgery": "Not CV surgery",
+    }
+    if data.get("incidenc") in incidenc_map:
+        data["incidenc"] = incidenc_map[data["incidenc"]]
+
+    # Arrhythmia timing fields
+    arrhythmia_timing_map = {
+        "Remote (> 30 days preop)": "Remote",
+        "Recent (<= 30 days preop)": "Recent",
+    }
+    for field in ("arrhythatrfib", "arrhythaflutter", "arrhyththird",
+                   "arrhythsecond", "arrhythsss", "arrhythvv"):
+        if data.get(field) in arrhythmia_timing_map:
+            data[field] = arrhythmia_timing_map[data[field]]
+
+    # --- Merged multi-field translations ---
+
+    # Diabetes: combine diabetes + diabctrl into single Shiny value
+    if data.get("diabetes") == "Yes" and data.get("diabctrl"):
+        ctrl = data["diabctrl"]
+        if ctrl == "Diet only":
+            ctrl = "Diet Only"
+        data["diabetes"] = f"Yes, {ctrl}"
+    elif data.get("diabetes") != "Yes":
+        data["diabetes"] = ""
+
+    # Endocarditis: combine infendo + infendty into single value
+    if data.get("infendo") == "Yes" and data.get("infendty"):
+        data["endocarditis"] = f"Yes, {data['infendty'].lower()}"
+    else:
+        data["endocarditis"] = ""
+
+    # CVD: merge cvd/cva/cvawhen/cvdtia into single array
+    cvd_items = []
+    if data.get("cva") == "Yes":
+        if data.get("cvawhen") == "<= 30 days":
+            cvd_items.append("CVA \u2264 30 days")
+        elif data.get("cvawhen") == "> 30 days":
+            cvd_items.append("CVA > 30 days")
+        else:
+            cvd_items.append("CVA")
+    if data.get("cvdtia") == "Yes":
+        cvd_items.append("TIA")
+    if data.get("cvd") == "Yes" and not cvd_items:
+        cvd_items.append("Other CVD")
+    data["_cvd_items"] = cvd_items
+
+    # MCS: merge iabpwhen/cathbasassistwhen/ecmowhen into mcs array
+    mcs_items = []
+    if data.get("iabpwhen"):
+        mcs_items.append("IABP")
+    if data.get("cathbasassistwhen"):
+        mcs_items.append("Catheter based assist device")
+    if data.get("ecmowhen"):
+        mcs_items.append("ECMO (any)")
+    data["_mcs_items"] = mcs_items
+
+    # Previous interventions: merge prcab/prvalve/pocpci/poc into prcvint array
+    prcvint_items = []
+    if data.get("prcab") == "Yes":
+        prcvint_items.append("CABG")
+    if data.get("prvalve") == "Yes":
+        prcvint_items.append("Valve")
+    if data.get("pocpci") == "Yes":
+        prcvint_items.append("PCI")
+    if data.get("poc") == "Yes":
+        prcvint_items.append("Other")
+    data["_prcvint_items"] = prcvint_items
+
+    # --- Fields that changed from selects to booleans ---
+    for field in ("hmo2", "pneumonia", "resusc", "carshock"):
+        val = data.get(field, "")
+        if val and val not in ("No", "Unknown", ""):
+            data[field] = "Yes"
+        elif val in ("No", "Unknown"):
+            data[field] = ""
+
+    return data
+
 
 def create_websocket_init_data():
     """Create the initial websocket data structure."""
@@ -272,10 +419,10 @@ def map_basic_fields(sts_query_dict, update_data):
     # Procedure
     if "procid" in sts_query_dict and sts_query_dict["procid"] in PROCID_TO_PROC:
         update_data["Proc"] = [PROCID_TO_PROC[sts_query_dict["procid"]]]
-    
+
     # Demographics
     if "age" in sts_query_dict and sts_query_dict["age"]:
-        update_data["ageN"] = int(sts_query_dict["age"])
+        update_data["ageN:shiny.number"] = int(sts_query_dict["age"])
     if "gender" in sts_query_dict and sts_query_dict["gender"]:
         update_data["gender"] = [sts_query_dict["gender"]]
     if "status" in sts_query_dict and sts_query_dict["status"]:
@@ -286,27 +433,27 @@ def map_basic_fields(sts_query_dict, update_data):
 def map_biometric_fields(sts_query_dict, update_data):
     """Map height, weight, and BMI fields."""
     if "heightcm" in sts_query_dict and sts_query_dict["heightcm"]:
-        update_data["heightN"] = float(sts_query_dict["heightcm"])
+        update_data["heightN:shiny.number"] = float(sts_query_dict["heightcm"])
     if "weightkg" in sts_query_dict and sts_query_dict["weightkg"]:
-        update_data["weightN"] = float(sts_query_dict["weightkg"])
-    
+        update_data["weightN:shiny.number"] = float(sts_query_dict["weightkg"])
+
     # Calculate BMI if both height and weight are available
-    if ("weightkg" in sts_query_dict and "heightcm" in sts_query_dict and 
+    if ("weightkg" in sts_query_dict and "heightcm" in sts_query_dict and
         sts_query_dict["weightkg"] and sts_query_dict["heightcm"]):
         bmi = float(sts_query_dict["weightkg"]) / ((float(sts_query_dict["heightcm"]) / 100.0) ** 2)
-        update_data["BMI"] = round(bmi, 2)
+        update_data["BMI:shiny.number"] = round(bmi, 2)
 
 def map_lab_fields(sts_query_dict, update_data):
     """Map laboratory values."""
     lab_mappings = {
-        "creatlst": ("creatlstN", float),
-        "hct": ("hctN", int),
-        "wbc": ("wbcN", float),
-        "platelets": ("plateletsN", int),
-        "hdef": ("hdef", float),
-        "medadpidis": ("medadpidis", int)
+        "creatlst": ("creatlstN:shiny.number", float),
+        "hct": ("hctN:shiny.number", int),
+        "wbc": ("wbcN:shiny.number", float),
+        "platelets": ("plateletsN:shiny.number", int),
+        "hdef": ("hdef:shiny.number", float),
+        "medadpidis": ("medadpidis:shiny.number", int),
     }
-    
+
     for sts_field, (ws_field, converter) in lab_mappings.items():
         if sts_field in sts_query_dict and sts_query_dict[sts_field]:
             update_data[ws_field] = converter(sts_query_dict[sts_field])
@@ -325,22 +472,24 @@ def map_array_fields(sts_query_dict, update_data):
 
 def map_procedure_fields(sts_query_dict, update_data):
     """Map previous procedure fields."""
-    # Previous cardiovascular intervention
-    if "prcvint" in sts_query_dict and sts_query_dict["prcvint"] == "Yes":
-        update_data["prcvint"] = ["Yes"]
-    if "pocpci" in sts_query_dict and sts_query_dict["pocpci"] == "Yes":
-        update_data["pocpci"] = ["Yes"]
-    
+    # Previous cardiovascular interventions (merged from prcab/prvalve/pocpci/poc)
+    if "_prcvint_items" in sts_query_dict and sts_query_dict["_prcvint_items"]:
+        update_data["prcvint"] = sts_query_dict["_prcvint_items"]
+
+    # PCI timing details
+    if sts_query_dict.get("pocpciwhen"):
+        update_data["pocpci"] = [sts_query_dict["pocpciwhen"]]
+
     # Valve procedures
-    valve_procs = [sts_query_dict[f"prvalveproc{i}"] 
-                   for i in range(1, 6) 
+    valve_procs = [sts_query_dict[f"prvalveproc{i}"]
+                   for i in range(1, 6)
                    if f"prvalveproc{i}" in sts_query_dict and sts_query_dict[f"prvalveproc{i}"]]
     if valve_procs:
         update_data["prvalveproc"] = valve_procs
-    
+
     # Other cardiac interventions
-    poc_ints = [sts_query_dict[f"pocint{i}"] 
-                for i in range(1, 8) 
+    poc_ints = [sts_query_dict[f"pocint{i}"]
+                for i in range(1, 8)
                 if f"pocint{i}" in sts_query_dict and sts_query_dict[f"pocint{i}"]]
     if poc_ints:
         update_data["pocint"] = poc_ints
@@ -362,19 +511,22 @@ def map_payor_fields(sts_query_dict, update_data):
 
 def map_special_condition_fields(sts_query_dict, update_data):
     """Map special condition fields that require multiple field checks."""
-    # Endocarditis
-    if sts_query_dict.get("infendo") == "Yes" and sts_query_dict.get("infendty"):
-        update_data["endocarditis"] = [sts_query_dict["infendty"]]
-    
-    # Diabetes control
-    if sts_query_dict.get("diabetes") == "Yes" and sts_query_dict.get("diabctrl"):
-        update_data["diabetes"] = [sts_query_dict["diabctrl"]]
+    # CVD: merged from cvd/cva/cvawhen/cvdtia by translate_csv_to_shiny()
+    if "_cvd_items" in sts_query_dict and sts_query_dict["_cvd_items"]:
+        update_data["cvd"] = sts_query_dict["_cvd_items"]
+
+    # MCS: merged from iabpwhen/cathbasassistwhen/ecmowhen by translate_csv_to_shiny()
+    if "_mcs_items" in sts_query_dict and sts_query_dict["_mcs_items"]:
+        update_data["mcs"] = sts_query_dict["_mcs_items"]
 
 def prepare_websocket_messages(sts_query_dict):
     """Prepare init and update messages for websocket communication."""
+    # Translate CSV values to Shiny-compatible values first
+    sts_query_dict = translate_csv_to_shiny(sts_query_dict)
+
     init_data = create_websocket_init_data()
     update_data = {}
-    
+
     # Apply all field mappings
     map_basic_fields(sts_query_dict, update_data)
     map_biometric_fields(sts_query_dict, update_data)
@@ -407,15 +559,16 @@ def print_debug_info(init_msg, update_msg):
     print(update_msg)
     print()
 
-async def query_sts_api_async(sts_query_dict):
+async def query_sts_api_async(sts_query_dict, debug=False):
     """
     Query the STS API via websocket.
     Input: a dict of STS query parameters.
     Output: the STS results dict.
     """
     init_msg, update_msg = prepare_websocket_messages(sts_query_dict)
-    print_debug_info(init_msg, update_msg)
-    
+    if debug:
+        print_debug_info(init_msg, update_msg)
+
     ws_headers = [
         ("Origin", "https://acsdriskcalc.research.sts.org"),
         ("Referer", "https://acsdriskcalc.research.sts.org/"),
@@ -426,70 +579,71 @@ async def query_sts_api_async(sts_query_dict):
         await ws.send(init_msg)
         await asyncio.sleep(1)  # Give the server time to process init
         await ws.send(update_msg)
-        
-        # Wait for response(s)
+
+        # Wait for the actual results response (skip initial "Selection Required" etc.)
         for _ in range(30):  # Try up to 30 messages
-            msg = await ws.recv()
+            try:
+                msg = await asyncio.wait_for(ws.recv(), timeout=15)
+            except asyncio.TimeoutError:
+                raise Exception("Timeout waiting for STS websocket response")
             try:
                 msg_data = json.loads(msg)
-                # Look for the response with errors and values.text2.html structure
-                if (msg_data.get("errors") is not None and 
-                    msg_data.get("values", {}).get("text2", {}).get("html")):
-                    # Parse the HTML content to extract risk values
-                    html_content = msg_data["values"]["text2"]["html"]
-                    result = parse_sts_html_response(html_content)
+                # The real result has errors == {} (empty) and values.text2.html
+                errors = msg_data.get("errors")
+                html = msg_data.get("values", {}).get("text2", {}).get("html")
+                if errors == {} and html:
+                    result = parse_sts_html_response(html)
                     if result and any(k in result for k in STS_EXPECTED_RESULTS):
                         return result
-            except Exception:
+            except (json.JSONDecodeError, AttributeError):
                 continue
-        
+
         raise Exception("No valid response from STS websocket API")
 
 def parse_sts_html_response(html_content):
     """
     Parse the HTML response from STS API to extract risk values.
-    The HTML contains the risk predictions that we need to extract.
+
+    The HTML contains pairs of <td> elements: label then percentage value.
     """
     import re
-    
-    result = {}
-    
-    # Define patterns to extract each risk value from HTML
-    risk_patterns = {
-        "predmort": r"Operative Mortality.*?(\d+\.?\d*)%",
-        "predmm": r"Major Morbidity.*?(\d+\.?\d*)%", 
-        "preddeep": r"Deep Sternal Wound Infection.*?(\d+\.?\d*)%",
-        "pred14d": r"Renal Failure.*?(\d+\.?\d*)%",
-        "predstro": r"Stroke.*?(\d+\.?\d*)%",
-        "predvent": r"Prolonged Ventilation.*?(\d+\.?\d*)%",
-        "predrenf": r"Renal Failure.*?(\d+\.?\d*)%",
-        "predreop": r"Re-operation.*?(\d+\.?\d*)%",
-        "pred6d": r"Short Length of Stay.*?(\d+\.?\d*)%"
+
+    LABEL_TO_KEY = {
+        "Operative Mortality": "predmort",
+        "Morbidity & Mortality": "predmm",
+        "Stroke": "predstro",
+        "Renal Failure": "predrenf",
+        "Reoperation": "predreop",
+        "Prolonged Ventilation": "predvent",
+        "Deep Sternal Wound Infection": "preddeep",
+        "Long Hospital Stay (>14 days)": "pred14d",
+        "Short Hospital Stay (<6 days)": "pred6d",
     }
-    
-    # Try to extract values using regex patterns
-    for key, pattern in risk_patterns.items():
-        match = re.search(pattern, html_content, re.IGNORECASE | re.DOTALL)
-        if match:
-            try:
-                # Convert percentage to decimal
-                result[key] = float(match.group(1)) / 100.0
-            except ValueError:
-                continue
-    
-    # If regex fails, try a more general approach looking for percentage values
-    if not result:
-        # Look for any percentage values in the HTML
-        percentage_matches = re.findall(r'(\d+\.?\d*)%', html_content)
-        if len(percentage_matches) >= len(STS_EXPECTED_RESULTS):
-            # Map the found percentages to expected results in order
-            for i, key in enumerate(STS_EXPECTED_RESULTS):
-                if i < len(percentage_matches):
-                    try:
-                        result[key] = float(percentage_matches[i]) / 100.0
-                    except ValueError:
-                        continue
-    
+
+    result = {}
+
+    # Extract all <td> contents in order
+    td_contents = re.findall(r'<td[^>]*>(.*?)</td>', html_content, re.DOTALL)
+
+    # Walk through pairs: label td, then value td
+    i = 0
+    while i < len(td_contents) - 1:
+        label = td_contents[i].strip()
+        # Strip any nested HTML tags from label
+        label = re.sub(r'<[^>]+>', '', label).strip()
+
+        for known_label, key in LABEL_TO_KEY.items():
+            if known_label in label:
+                value_cell = td_contents[i + 1].strip()
+                value_cell = re.sub(r'<[^>]+>', '', value_cell).strip()
+                pct_match = re.search(r'([\d.]+)\s*%', value_cell)
+                if pct_match:
+                    result[key] = float(pct_match.group(1)) / 100.0
+                i += 2
+                break
+        else:
+            i += 1
+
     return result
 
 def query_sts_api(sts_query_dict):
@@ -561,6 +715,11 @@ def validate_and_return_csv_data(csv_entry):
         "Health Maintenance Organization",
         "Non-U.S. Plan",
         "Other",
+        # New Shiny-style values
+        "Commercial",
+        "Medicare (any type)",
+        "Medicaid (any type)",
+        "HMO",
         "",
     ]
     assert data["payorprim"] in payors, "Invalid payorprim"
@@ -649,6 +808,7 @@ def validate_and_return_csv_data(csv_entry):
         "Moderate",
         "Severe",
         "Lung disease documented, severity unknown",
+        "Severity Unknown",
         "Unknown",
         "",
     ], "Invalid chrlungd"
@@ -662,6 +822,8 @@ def validate_and_return_csv_data(csv_entry):
         "<= 1 drink/week",
         "2-7 drinks/week",
         ">= 8 drinks/week",
+        "\u2264 1 drink/week",
+        "\u2265 8 drinks/week",
         "None",
         "Unknown",
         "",
@@ -672,6 +834,7 @@ def validate_and_return_csv_data(csv_entry):
         "Remote",
         "No",
         "Unknown",
+        "Yes",
         "",
     ], "Invalid pneumonia"
 
@@ -680,6 +843,7 @@ def validate_and_return_csv_data(csv_entry):
         "Current every day smoker",
         "Current some day smoker",
         "Smoker, current status (frequency) unknown",
+        "Current smoker",
         "Former smoker",
         "Smoking status unknown",
         "",
@@ -690,6 +854,7 @@ def validate_and_return_csv_data(csv_entry):
         "Yes, oxygen dependent",
         "No",
         "Unknown",
+        "Yes",
         "",
     ], "Invalid hmo2"
 
@@ -721,16 +886,21 @@ def validate_and_return_csv_data(csv_entry):
 
     assert data["miwhen"] in [
         "<=6 Hrs",
+        "\u2264 6 Hrs",
         ">6 Hrs but <24 Hrs",
         "1 to 7 Days",
         "8 to 21 Days",
         ">21 Days",
+        "> 21 Days",
         "",
     ], "Invalid miwhen"
     assert data["heartfailtmg"] in [
         "Acute",
         "Chronic",
         "Both",
+        "Yes - Acute",
+        "Yes - Chronic",
+        "Yes - Both",
         "",
     ], "Invalid heartfailtmg"
 
@@ -749,10 +919,12 @@ def validate_and_return_csv_data(csv_entry):
     assert data["carshock"] in [
         "Yes - At the time of the procedure",
         "Yes, not at the time of the procedure but within prior 24 hours",
+        "Yes",
         "",
     ], "Invalid carshock"
 
-    rhythm_onset = ["None", "Remote (> 30 days preop)", "Recent (<= 30 days preop)", ""]
+    rhythm_onset = ["None", "Remote (> 30 days preop)", "Recent (<= 30 days preop)",
+                     "Remote", "Recent", ""]
     assert data["arrhythatrfib"] in rhythm_onset, "Invalid arrhythatrfib"
     assert data["arrhythafib"] in ["Persistent", "Paroxysmal", ""], "Invalid arrhythafib"
     assert data["arrhythaflutter"] in rhythm_onset, "Invalid arrhythaflutter"
@@ -778,6 +950,7 @@ def validate_and_return_csv_data(csv_entry):
     assert data["resusc"] in [
         "Yes - Within 1 hour of the start of the procedure",
         "Yes - More than 1 hour but less than 24 hours of the start of the procedure",
+        "Yes",
         "",
     ], "Invalid resusc"
 
@@ -860,6 +1033,13 @@ def validate_and_return_csv_data(csv_entry):
         "Third re-op cardiovascular surgery",
         "Fourth or more re-op cardiovascular surgery",
         "NA - Not a cardiovascular surgery",
+        # New Shiny-style values
+        "First CV surgery",
+        "ReOp#1 CV surgery",
+        "ReOp#2 CV surgery",
+        "ReOp#3 CV surgery",
+        "ReOp#4+ CV surgery",
+        "Not CV surgery",
         "",
     ], "Invalid incidenc"
 
