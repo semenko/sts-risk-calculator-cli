@@ -17,16 +17,17 @@ Repeatedly query the Society of Thoracic Surgeons Adult Cardiac Risk Calculator 
 # Overview
 This is a minimalist Python command line tool to query the STS risk calculator with bulk patient records. This returns all available mortality and complication data from the STS. There is no upper limit to your query size -- this has been successfully run on datasets of ~500+ patients. 
 
-The STS Calculator itself is a black box — patient parameters are passed to the STS API and a risk is returned (almost no computing happens client side).  A few obvious parameters impact mortality heavily (e.g. ESRD).
+The STS Calculator itself is a black box — patient parameters are passed to the STS via a WebSocket connection to their Shiny app at `acsdriskcalc.research.sts.org` and a risk is returned (almost no computing happens client side). A few obvious parameters impact mortality heavily (e.g. ESRD).
 
 
 ## Features
-- Programmatically queries the STS [Short-Term Risk Calculator](https://www.sts.org/resources/risk-calculator) (version 4.2)
+- Programmatically queries the STS [Short-Term Risk Calculator](https://www.sts.org/resources/risk-calculator) via WebSocket
 - Parses input .csv records of patients
 - Performs automatic validation of most input records
 - Optionally override individual parameters from your bulk records
     - For example, how does mortality change if all patients have the same age or renal function?
-- Returns all avalable STS risk model parameters (mortality, prolonged ventilation, reoperation, etc.)
+- Returns all available STS risk model parameters (mortality, prolonged ventilation, reoperation, etc.)
+- Backward-compatible CSV format — old-style parameter values are automatically translated to the current Shiny app format
 
 
 # Example Usage
@@ -73,6 +74,9 @@ id,predmort,predmm,preddeep,pred14d,predstro,predvent,predrenf,predreop,pred6d
 2,0.10089,0.48756,0.0028,0.25896,0.01259,0.30205,0.21811,0.04919,0.06589
 3,0.01906,0.14991,0.00416,0.04517,0.00802,0.0852,0.02145,0.03302,0.38684
 ```
+
+> **Note:** The sample results above are from an older version of the STS risk model. Your results may differ as STS periodically updates their prediction models.
+
 The STS result abbreviations (e.g. predstro) are [described here](#sts-result-abbreviations).
 
 
@@ -82,7 +86,7 @@ The STS result abbreviations (e.g. predstro) are [described here](#sts-result-ab
 $ ./sts-query.py
 usage: sts-query.py [options]
 
-Query the STS Short-Term Risk Calculator (v4.2) via a CSV.
+Query the STS Short-Term Risk Calculator via a CSV.
 Please cite this repository if you're using in a publication.
 
 optional arguments:
@@ -125,7 +129,7 @@ Released under the MIT License.  Copyright 2022, [Nick Semenkovich](https://nick
 
 # STS Parameters
 
-The STS Risk Calculator version 4.2 defines these parameters. Note that the API is a bit sketchy: abbreviations are difficult to decipher and erratic (e.g. sometimes "race" is truncated to "rac"), and types are strange (sometimes fields want integers, while other times they want strings like "Two" …).
+The STS Risk Calculator defines these CSV input parameters. Note that the API is a bit sketchy: abbreviations are difficult to decipher and erratic (e.g. sometimes "race" is truncated to "rac"), and types are strange (sometimes fields want integers, while other times they want strings like "Two" …). Old-style values (from the previous REST API) are automatically translated to the current Shiny WebSocket format.
 
 | STS Field ID  | Description/Notes | Options
 | ----------- | ----------- | ----------- |
