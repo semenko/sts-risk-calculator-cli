@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sts-risk-calculator"
-version = "1.1.0"
+version = "1.2.0"
 description = "Bulk query the STS Short-Term Risk Calculator via CSV patient data"
 readme = "README.md"
 license = "MIT"
