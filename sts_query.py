@@ -163,9 +163,16 @@ PROCID_TO_PROC = {
 BOOLEAN_FIELDS = [
     "medacei48", "medgp", "medinotr", "medster", "medadp5days", "fhcad",
     "hypertn", "liverdis", "mediastrad", "unrespstat", "dialysis", "cancer",
-    "syncope", "immsupp", "pneumonia", "slpapn", "hmo2", "pvd", "cvdstenrt",
-    "cvdpcarsurg", "cvdstenlft", "carshock", "resusc", "stenleftmain",
-    "laddiststenpercent", "vdstena", "vdstenm", "vdaoprimet"
+    "syncope", "immsupp", "pneumonia", "slpapn", "hmo2", "pvd",
+    "cvdpcarsurg", "carshock", "resusc", "stenleftmain",
+    "vdstena", "vdstenm"
+]
+
+# These fields have multi-value CSV inputs (e.g. "80% to 99%", ">=70%",
+# "Degenerative- Calcified") but the Shiny app only accepts a boolean
+# checkbox. Any non-empty value should be sent as True.
+PRESENCE_BOOLEAN_FIELDS = [
+    "cvdstenrt", "cvdstenlft", "laddiststenpercent", "vdaoprimet"
 ]
 
 ARRAY_FIELD_MAPPINGS = {
@@ -390,6 +397,7 @@ def create_websocket_init_data():
         "copybuttonsummary:shiny.action": 0,
         "vstrpr": False,
         **{field: False for field in BOOLEAN_FIELDS},
+        **{field: False for field in PRESENCE_BOOLEAN_FIELDS},
         "ageN:shiny.number": None,
         "heightN:shiny.number": None,
         "weightN:shiny.number": None,
@@ -462,6 +470,10 @@ def map_boolean_fields(sts_query_dict, update_data):
     """Map boolean fields."""
     for field in BOOLEAN_FIELDS:
         if field in sts_query_dict and sts_query_dict[field] == "Yes":
+            update_data[field] = True
+    # Presence-based booleans: any non-empty value means True
+    for field in PRESENCE_BOOLEAN_FIELDS:
+        if field in sts_query_dict and sts_query_dict[field]:
             update_data[field] = True
 
 def map_array_fields(sts_query_dict, update_data):
