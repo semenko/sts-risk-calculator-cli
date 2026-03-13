@@ -1,7 +1,7 @@
 <div align="center">
  <h1><strong>Bulk STS Risk Calculator Query Tool</strong></h1>
 
-[![License: GPL v3](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Code
 Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
@@ -37,7 +37,7 @@ The STS Calculator itself is a black box — patient parameters are passed to th
 
 # Example Usage
 
-You must provide a CSV with a unique **id** per row, followed by a minimum of **procid**, **age**, **weightkg**, and **heightkg**. All other parameters are optional.
+You must provide a CSV with a unique **id** per row, followed by a minimum of **procid** and **age**. All other parameters are optional.
 
 The most critical step is formatting your data to **exactly** match the STS risk parameter names & values ([detailed here](#sts-parameters)). The calculator API is inflexible -- spacing, capitalization, etc. must be identical to the STS database.
 
@@ -154,8 +154,8 @@ The STS Risk Calculator defines these CSV input parameters. Note that the API is
 | payorprim | Primary payor | *(see STS site: "None / self", …)* |
 | payorsecond | Secondary payor (requires payorprim to be set) | … |
 | surgdt | Surgery date | as MM/DD/YYYY |
-| weightkg | (**Required**) | 10-250 |
-| heightcm | (**Required**) | 20-251 |
+| weightkg | | 10-250 |
+| heightcm | | 20-251 |
 | hct | | 1-100 |
 | wbc | | 0.1-100 |
 | platelets | | 1000-90,000|

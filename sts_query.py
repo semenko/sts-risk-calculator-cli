@@ -736,7 +736,6 @@ def validate_and_return_csv_data(csv_entry):
     )
 
     ## Biometrics
-    # We require weight/height for BMI calc later
     assert (data["weightkg"] == "") or 10 <= float(data["weightkg"]) <= 250, "Invalid weightkg"
     assert (data["heightcm"] == "") or 20 <= float(data["heightcm"]) <= 251, "Invalid heightcm"
 
