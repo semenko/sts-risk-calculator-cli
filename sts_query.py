@@ -606,6 +606,7 @@ def parse_sts_html_response(html_content):
 
     The HTML contains pairs of <td> elements: label then percentage value.
     """
+    import html
     import re
 
     LABEL_TO_KEY = {
@@ -629,8 +630,8 @@ def parse_sts_html_response(html_content):
     i = 0
     while i < len(td_contents) - 1:
         label = td_contents[i].strip()
-        # Strip any nested HTML tags from label
-        label = re.sub(r'<[^>]+>', '', label).strip()
+        # Strip any nested HTML tags and decode HTML entities from label
+        label = html.unescape(re.sub(r'<[^>]+>', '', label)).strip()
 
         for known_label, key in LABEL_TO_KEY.items():
             if known_label in label:
