@@ -2,6 +2,7 @@
  <h1><strong>Bulk STS Risk Calculator Query Tool</strong></h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19003690.svg)](https://doi.org/10.5281/zenodo.19003690)
 [![Code
 Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
@@ -119,7 +120,7 @@ This can be useful when comparing mortality predictions associated with populati
 
 
 # Citation & License
-If you use this in your publication, please consider citing this work as: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli**
+If you use this in your publication, please consider citing this work as: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli** [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19003690.svg)](https://doi.org/10.5281/zenodo.19003690)
 
 Released under the MIT License.  Copyright 2022, [Nick Semenkovich](https://nick.semenkovich.com/) \<semenko@alum.mit.edu\> 
 
