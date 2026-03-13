@@ -736,8 +736,8 @@ def validate_and_return_csv_data(csv_entry):
 
     ## Biometrics
     # We require weight/height for BMI calc later
-    assert 10 <= float(data["weightkg"]) <= 250, "Invalid weightkg"
-    assert 20 <= float(data["heightcm"]) <= 251, "Invalid heightcm"
+    assert (data["weightkg"] == "") or 10 <= float(data["weightkg"]) <= 250, "Invalid weightkg"
+    assert (data["heightcm"] == "") or 20 <= float(data["heightcm"]) <= 251, "Invalid heightcm"
 
     ## Labs
     assert (data["hct"] == "") or (1 <= int(data["hct"]) <= 100), "Invalid hct"
@@ -938,7 +938,7 @@ def validate_and_return_csv_data(csv_entry):
 
     # NOTE: The API allows contraindicated & unknown, which we ignore.  Yes/No/Empty.
     assert data["medadp5days"] in yes_or_empty, "Invalid medadp5days"  # ADPi
-    assert (data["medadpidis"] == "") or 1 <= int(
+    assert (data["medadpidis"] == "") or 0 <= int(
         float(data["medadpidis"])
     ) <= 5, "Invalid medadpidis"
 
