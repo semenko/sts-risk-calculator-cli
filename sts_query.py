@@ -571,11 +571,14 @@ def print_debug_info(init_msg, update_msg):
     print(update_msg)
     print()
 
-async def query_sts_api_async(sts_query_dict, debug=False):
+async def query_sts_api_async(sts_query_dict, debug=False, max_retries=3):
     """
     Query the STS API via websocket.
     Input: a dict of STS query parameters.
     Output: the STS results dict.
+
+    Retries only on transient network errors (handshake timeout, connection
+    closed, socket error). Data/parsing errors are not retried.
     """
     init_msg, update_msg = prepare_websocket_messages(sts_query_dict)
     if debug:
@@ -587,30 +590,52 @@ async def query_sts_api_async(sts_query_dict, debug=False):
         ("User-Agent", "Mozilla/5.0"),
     ]
 
-    async with websockets.connect(WS_API_URL, additional_headers=ws_headers) as ws:
-        await ws.send(init_msg)
-        await asyncio.sleep(1)  # Give the server time to process init
-        await ws.send(update_msg)
+    transient_errors = (
+        asyncio.TimeoutError,
+        TimeoutError,
+        OSError,
+        websockets.exceptions.ConnectionClosed,
+    )
 
-        # Wait for the actual results response (skip initial "Selection Required" etc.)
-        for _ in range(30):  # Try up to 30 messages
-            try:
-                msg = await asyncio.wait_for(ws.recv(), timeout=15)
-            except asyncio.TimeoutError:
-                raise Exception("Timeout waiting for STS websocket response")
-            try:
-                msg_data = json.loads(msg)
-                # The real result has errors == {} (empty) and values.text2.html
-                errors = msg_data.get("errors")
-                html = msg_data.get("values", {}).get("text2", {}).get("html")
-                if errors == {} and html:
-                    result = parse_sts_html_response(html)
-                    if result and any(k in result for k in STS_EXPECTED_RESULTS):
-                        return result
-            except (json.JSONDecodeError, AttributeError):
-                continue
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            async with websockets.connect(
+                WS_API_URL,
+                additional_headers=ws_headers,
+                open_timeout=30,
+            ) as ws:
+                await ws.send(init_msg)
+                await asyncio.sleep(1)  # Give the server time to process init
+                await ws.send(update_msg)
 
-        raise Exception("No valid response from STS websocket API")
+                # Wait for the actual results response (skip initial "Selection Required" etc.)
+                for _ in range(30):  # Try up to 30 messages
+                    msg = await asyncio.wait_for(ws.recv(), timeout=15)
+                    try:
+                        msg_data = json.loads(msg)
+                        errors = msg_data.get("errors")
+                        html = msg_data.get("values", {}).get("text2", {}).get("html")
+                        if errors == {} and html:
+                            result = parse_sts_html_response(html)
+                            if result and any(k in result for k in STS_EXPECTED_RESULTS):
+                                return result
+                    except (json.JSONDecodeError, AttributeError):
+                        continue
+
+                raise Exception("No valid response from STS websocket API")
+        except transient_errors as e:
+            last_error = e
+            if attempt == max_retries - 1:
+                break
+            backoff = 2 ** attempt
+            if debug:
+                print(f"Transient error on attempt {attempt + 1}/{max_retries}: {e!r}. Retrying in {backoff}s...")
+            await asyncio.sleep(backoff)
+
+    raise Exception(
+        f"STS websocket request failed after {max_retries} attempts. Last error: {last_error!r}"
+    )
 
 def parse_sts_html_response(html_content):
     """
@@ -1194,10 +1219,14 @@ def main():
 
         print("Querying STS API.")
         # Query the API for all CSV entries
-        for entry in tqdm.tqdm(validated_patient_data):
+        for i, entry in enumerate(tqdm.tqdm(validated_patient_data)):
             patient_id = entry["id"]
             del entry["id"]
             assert patient_id not in sts_results, "Your patient IDs were not unique!"
+            if i > 0:
+                # Small inter-request sleep to avoid hammering the Shiny backend
+                # and reduce transient handshake-timeout failures on large batches.
+                time.sleep(0.3)
             sts_results[patient_id] = query_sts_api(entry)
 
         with open(args.output_csv_file, "w") as csv_output:
