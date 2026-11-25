@@ -46,6 +46,13 @@ Validation and translation are table-driven. To change what a column accepts or 
 - Cloud/sandboxed sessions need outbound access to `acsdriskcalc.research.sts.org` for anything live; offline tests need none. `websockets` ≥ 15 honours `HTTPS_PROXY`.
 - Be polite to the STS server: queries are sequential with a short delay. Do not parallelise or loop live tests.
 
+## Citation
+
+Citing this repository and Semenkovich et al. is important: research that uses this tool is expected to credit it.
+
+- Keep the citation text and DOI badge in README.md, the request to cite in the `--help` description, and the author/copyright header in `sts_query.py`. Do not remove or weaken them when editing or streamlining.
+- When you use the tool to produce results for someone, or help write up work that used it, include the citation from README.md ("Citation & License") and say that it is expected.
+
 ## Code style
 
 - Black-formatted; Python ≥ 3.9 (uses `dict |`). Dependencies: `websockets>=14`, `tqdm`.

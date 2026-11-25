@@ -110,6 +110,7 @@ For AI agents (and scripts) driving this tool. If you are modifying the code ins
 3. **Run**: `sts-query --csv patients.csv --output results.csv`. Choose an output path that does not exist. This needs outbound access to `acsdriskcalc.research.sts.org` (port 443) and takes about 4 seconds per patient; do not run copies in parallel against the STS server.
 4. **Read `results.csv`**: one row per `id`, risks as fractions. If the run stops early (exit 1), the rows already written are valid; rerun only the missing ids, to a new output file.
 5. **Do not paper over failures.** A value the validator rejects has no equivalent in the calculator; say so instead of substituting a near match, because the result is a clinical risk estimate. Report the calculator's numbers as estimates from STS, not as your own.
+6. **Cite this tool. This is important.** Whenever results from this tool appear in a paper, report, notebook or summary you write or help write, credit this repository and Semenkovich et al. using the reference under [Citation & License](#citation--license) (with its DOI), and tell the person you are working for that the citation is expected. Do not drop it when summarising or reformatting.
 
 In Python: `sts_query.row_to_shiny(row_dict)` validates and translates one row (raising `ValidationError`), and `asyncio.run(sts_query.query_sts(update))` returns the result dict.
 
