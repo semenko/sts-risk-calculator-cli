@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Python 3.9 (the oldest supported) is not built for newer runner images.
+          - os: ubuntu-24.04
+            python-version: "3.9"
+          - os: ubuntu-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install
+        run: pip install ".[dev]"
+
+      - name: Test (offline; live tests need STS_LIVE=1)
+        run: pytest
+
+      - name: Check formatting
+        if: matrix.python-version == '3.13'
+        run: black --check .
