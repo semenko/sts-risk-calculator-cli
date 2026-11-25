@@ -51,6 +51,7 @@ Validation and translation are table-driven. To change what a column accepts or 
 Citing this repository and Semenkovich et al. is important: research that uses this tool is expected to credit it.
 
 - Keep the citation text and DOI badge in README.md, the request to cite in the `--help` description, and the author/copyright header in `sts_query.py`. Do not remove or weaken them when editing or streamlining.
+- `CITATION.cff` (GitHub's "Cite this repository" button) and `.zenodo.json` (metadata for the Zenodo archive made at each GitHub release) carry the author, ORCID and DOI. Keep them consistent with the README citation. Neither holds a version number, so releases need no edit there.
 - When you use the tool to produce results for someone, or help write up work that used it, include the citation from README.md ("Citation & License") and say that it is expected.
 
 ## Code style
