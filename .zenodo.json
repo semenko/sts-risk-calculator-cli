@@ -1,0 +1,27 @@
+{
+  "title": "STS Risk Calculator CLI",
+  "description": "A Python command line tool to bulk-query the Society of Thoracic Surgeons (STS) Short-Term Risk Calculator with CSV patient records.",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Semenkovich, Nicholas P.",
+      "orcid": "0000-0001-5266-6734"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "cardiac surgery",
+    "risk prediction",
+    "Society of Thoracic Surgeons",
+    "STS risk calculator",
+    "operative mortality"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/semenko/sts-risk-calculator-cli",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    }
+  ]
+}
