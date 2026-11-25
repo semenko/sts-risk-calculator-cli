@@ -2,7 +2,7 @@
  <h1><strong>Bulk STS Risk Calculator Query Tool</strong></h1>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24518896.svg)](https://doi.org/10.5281/zenodo.24518896)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19003689.svg)](https://doi.org/10.5281/zenodo.19003689)
 [![Code
 Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
@@ -187,6 +187,6 @@ Version 1.3.0 audited every value against the live calculator, which silently ig
 
 # Citation & License
 
-If you use this in a publication, please cite: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli** [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24518896.svg)](https://doi.org/10.5281/zenodo.24518896)
+If you use this in a publication, please cite: **STS Risk Calculator CLI, Nicholas P. Semenkovich, 2022. https://github.com/semenko/sts-risk-calculator-cli** [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19003689.svg)](https://doi.org/10.5281/zenodo.19003689)
 
 Released under the MIT License. Copyright 2022, [Nick Semenkovich](https://nick.semenkovich.com/) \<semenko@alum.mit.edu\>
